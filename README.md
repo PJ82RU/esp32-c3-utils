@@ -2,6 +2,7 @@
 
 ![Лицензия](https://img.shields.io/badge/license-Unlicense-blue.svg)
 ![PlatformIO](https://img.shields.io/badge/platform-ESP32--C3-green.svg)
+![Version](https://img.shields.io/badge/version-1.0.0-orange)
 
 Комплексная библиотека утилит для работы с ESP32-C3, включающая:
 
