@@ -1,5 +1,5 @@
-#ifndef SLEEP_UTILS_H
-#define SLEEP_UTILS_H
+#ifndef ESP32_C3_SLEEP_UTILS_H
+#define ESP32_C3_SLEEP_UTILS_H
 
 /**
  * @file sleep_utils.h
@@ -47,4 +47,4 @@ namespace esp32_c3_utils
     WakeupSource getWakeupCause() noexcept;
 } // namespace esp32_c3_utils
 
-#endif //SLEEP_UTILS_H
+#endif //ESP32_C3_SLEEP_UTILS_H

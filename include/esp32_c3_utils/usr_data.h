@@ -1,5 +1,5 @@
-#ifndef USR_DATA_H
-#define USR_DATA_H
+#ifndef ESP32_C3_UTILS_USR_DATA_H
+#define ESP32_C3_UTILS_USR_DATA_H
 
 /**
  * @file usr_data.h
@@ -34,4 +34,4 @@ namespace esp32_c3_utils
     bool isUserDataWritten() noexcept;
 } // namespace esp32_c3_utils
 
-#endif //USR_DATA_H
+#endif //ESP32_C3_UTILS_USR_DATA_H

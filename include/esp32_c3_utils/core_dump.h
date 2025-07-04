@@ -1,5 +1,5 @@
-#ifndef CORE_DUMP_H
-#define CORE_DUMP_H
+#ifndef ESP32_C3_UTILS_CORE_DUMP_H
+#define ESP32_C3_UTILS_CORE_DUMP_H
 
 /**
  * @file core_dump.h
@@ -18,4 +18,4 @@ namespace esp32_c3_utils {
 
 } // namespace esp32_c3_utils
 
-#endif //CORE_DUMP_H
+#endif //ESP32_C3_UTILS_CORE_DUMP_H

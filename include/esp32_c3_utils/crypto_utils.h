@@ -1,5 +1,5 @@
-#ifndef CRYPTO_UTILS_H
-#define CRYPTO_UTILS_H
+#ifndef ESP32_C3_CRYPTO_UTILS_H
+#define ESP32_C3_CRYPTO_UTILS_H
 
 /**
  * @file crypto_utils.h
@@ -55,4 +55,4 @@ namespace esp32_c3_utils
                        size_t size) noexcept;
 } // namespace esp32_c3_utils
 
-#endif //CRYPTO_UTILS_H
+#endif //ESP32_C3_CRYPTO_UTILS_H

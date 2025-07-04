@@ -1,5 +1,5 @@
-#ifndef TEMP_SENSOR_H
-#define TEMP_SENSOR_H
+#ifndef ESP32_C3_UTILS_TEMP_SENSOR_H
+#define ESP32_C3_UTILS_TEMP_SENSOR_H
 
 /**
  * @file temp_sensor.h
@@ -36,4 +36,4 @@ namespace esp32_c3_utils
     void deinitTempSensor();
 } // namespace esp32_c3_utils
 
-#endif //TEMP_SENSOR_H
+#endif //ESP32_C3_UTILS_TEMP_SENSOR_H

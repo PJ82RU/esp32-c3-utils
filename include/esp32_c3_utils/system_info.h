@@ -1,5 +1,5 @@
-#ifndef SYSTEM_INFO_H
-#define SYSTEM_INFO_H
+#ifndef ESP32_C3_UTILS_SYSTEM_INFO_H
+#define ESP32_C3_UTILS_SYSTEM_INFO_H
 
 /**
  * @file system_info.h
@@ -60,4 +60,4 @@ namespace esp32_c3_utils
     bool getSystemInfo(SystemInfo& info) noexcept;
 } // namespace esp32_c3_utils
 
-#endif //SYSTEM_INFO_H
+#endif //ESP32_C3_UTILS_SYSTEM_INFO_H

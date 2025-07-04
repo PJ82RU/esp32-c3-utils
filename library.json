@@ -1,18 +1,54 @@
 {
   "name": "ESP32-C3 Utils",
   "version": "1.0.0",
-  "keywords": "esp32, c3, utilities, rtc, sleep, power, crypto",
-  "description": "Utility library for ESP32-C3 with RTC, sleep, power management and crypto functions",
+  "keywords": "esp32, c3, utilities, crypto, power, rtc, sleep",
+  "description": "Comprehensive utility library for ESP32-C3 with power management, crypto functions, RTC utilities and more",
   "repository": {
     "type": "git",
     "url": "https://github.com/PJ82RU/esp32-c3-utils.git"
   },
   "authors": [
     {
-      "name": "PJ82",
-      "email": "project82@mail.ru"
+      "name": "PJ82. Spiridonov Vladislav",
+      "email": "project82@mail.ru",
+      "maintainer": true
     }
   ],
+  "license": "Unlicense",
   "frameworks": "arduino",
-  "platforms": "espressif32"
+  "platforms": "espressif32",
+  "headers": [
+    "esp32_c3_utils.h",
+    "bytes_utils.h",
+    "clock_utils.h",
+    "crypto_utils.h",
+    "power_utils.h",
+    "rtc_utils.h",
+    "sleep_utils.h",
+    "system_info.h",
+    "temp_sensor.h",
+    "core_dump.h",
+    "usr_data.h",
+    "callback.h",
+    "led.h",
+    "queue.h",
+    "semaphore.h",
+    "simple_callback.h",
+    "thread.h"
+  ],
+  "dependencies": {
+    "arduino-libraries/Arduino-ESP32": ">=2.0.0"
+  },
+  "examples": [
+    {
+      "name": "Basic Usage",
+      "base": "examples/basic",
+      "files": ["basic.cpp"]
+    },
+    {
+      "name": "Power Management",
+      "base": "examples/power",
+      "files": ["power.cpp"]
+    }
+  ]
 }

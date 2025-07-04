@@ -1,5 +1,5 @@
-#ifndef RTC_UTILS_H
-#define RTC_UTILS_H
+#ifndef ESP32_C3_RTC_UTILS_H
+#define ESP32_C3_RTC_UTILS_H
 
 /**
  * @file rtc_utils.h
@@ -40,4 +40,4 @@ namespace esp32_c3_utils
     void clearRtcMemory(size_t offset, size_t size) noexcept;
 } // namespace esp32_c3_utils
 
-#endif //RTC_UTILS_H
+#endif //ESP32_C3_RTC_UTILS_H

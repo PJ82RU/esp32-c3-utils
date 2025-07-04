@@ -1,5 +1,5 @@
-#ifndef POWER_UTILS_H
-#define POWER_UTILS_H
+#ifndef ESP32_C3_POWER_UTILS_H
+#define ESP32_C3_POWER_UTILS_H
 
 /**
  * @file power_utils.h
@@ -55,4 +55,4 @@ namespace esp32_c3_utils
     void enterPowerSave(PowerSaveMode mode, uint32_t durationMs = 0) noexcept;
 } // namespace esp32_c3_utils
 
-#endif //POWER_UTILS_H
+#endif //ESP32_C3_POWER_UTILS_H
