@@ -21,7 +21,7 @@
 Добавьте в ваш platformio.ini:
 ```ini
 lib_deps =
-https://github.com/PJ82RU/esp32-c3-utils.git
+    https://github.com/PJ82RU/esp32-c3-utils.git
 ```
 
 ### Arduino IDE
