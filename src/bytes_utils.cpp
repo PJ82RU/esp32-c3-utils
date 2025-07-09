@@ -2,14 +2,14 @@
 
 namespace esp32_c3_utils
 {
-    String bytesToHex(const uint8_t* bytes, const size_t size, const bool upperCase) noexcept
+    std::string bytesToHex(const uint8_t* bytes, const size_t size, const bool upperCase) noexcept
     {
         if (bytes == nullptr || size == 0)
         {
             return {};
         }
 
-        String result;
+        std::string result;
         result.reserve(size * 2); // Оптимизация: предварительное выделение памяти
 
         const char* hexChars = upperCase ? "0123456789ABCDEF" : "0123456789abcdef";
@@ -23,14 +23,14 @@ namespace esp32_c3_utils
         return result;
     }
 
-    bool hexToBytes(const String& hex, uint8_t* bytes, const size_t size) noexcept
+    bool hexToBytes(const std::string& hex, uint8_t* bytes, const size_t size) noexcept
     {
-        if (hex.isEmpty() || bytes == nullptr || size == 0 || hex.length() % 2 != 0)
+        if (hex.empty() || bytes == nullptr || size == 0 || hex.length() % 2 != 0)
         {
             return false;
         }
 
-        const size_t len = min(size, hex.length() / 2);
+        const size_t len = std::min(size, hex.length() / 2);
 
         for (size_t i = 0, j = 0; j < len; i += 2, ++j)
         {

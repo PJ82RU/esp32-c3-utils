@@ -12,7 +12,7 @@ namespace esp32_c3_utils
      * @param upperCase Флаг использования верхнего регистра
      * @return HEX-строка
      */
-    String bytesToHex(const uint8_t* bytes, size_t size, bool upperCase = true) noexcept;
+    std::string bytesToHex(const uint8_t* bytes, size_t size, bool upperCase = true) noexcept;
 
     /**
      * @brief Конвертирует HEX-строку в массив байт
