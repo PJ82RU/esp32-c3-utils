@@ -1,19 +1,24 @@
 #ifndef ESP32_C3_UTILS_QUEUE_H
 #define ESP32_C3_UTILS_QUEUE_H
 
-#include <Arduino.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/queue.h>
+#include <esp_log.h>
 
-namespace esp32_c3_objects
+namespace esp32_c3::objects
 {
     /**
      * @brief Класс-обертка для работы с очередью FreeRTOS
      *
      * @details Предоставляет безопасный интерфейс для работы с очередями FreeRTOS
-     *          с поддержкой RAII и семантики перемещения
+     *          с поддержкой RAII и семантики перемещения. Гарантирует освобождение
+     *          ресурсов при уничтожении объекта.
      */
     class Queue
     {
     public:
+        static constexpr auto TAG = "Queue"; ///< Тег для логирования
+
         /**
          * @brief Конструктор очереди FreeRTOS
          * @param queueLength Максимальное количество элементов в очереди
@@ -29,8 +34,17 @@ namespace esp32_c3_objects
         Queue(const Queue&) = delete;
         Queue& operator=(const Queue&) = delete;
 
-        // Поддержка перемещения
+        /**
+         * @brief Конструктор перемещения
+         * @param other Объект для перемещения
+         */
         Queue(Queue&& other) noexcept;
+
+        /**
+         * @brief Оператор перемещения
+         * @param other Объект для перемещения
+         * @return Ссылка на текущий объект
+         */
         Queue& operator=(Queue&& other) noexcept;
 
         /**
@@ -76,12 +90,14 @@ namespace esp32_c3_objects
         void reset() const noexcept;
 
     private:
-        /// @brief Внутренняя функция для освобождения ресурсов
+        /**
+         * @brief Внутренняя функция для освобождения ресурсов
+         * @note Вызывается при уничтожении или перемещении объекта
+         */
         void cleanup() noexcept;
 
-        /// Хэндл очереди FreeRTOS
-        QueueHandle_t mHandle = nullptr;
+        QueueHandle_t mHandle = nullptr; ///< Хэндл очереди FreeRTOS
     };
-} // namespace esp32_c3_utils
+} // namespace esp32_c3::objects
 
 #endif // ESP32_C3_UTILS_QUEUE_H

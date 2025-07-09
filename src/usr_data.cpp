@@ -1,39 +1,49 @@
 #include "esp32_c3_utils/usr_data.h"
+
+#include <array>
+
+#include <algorithm>
 #include <esp_efuse.h>
 #include <esp_efuse_table.h>
-#include <cstring>
-#include <array>
-#include <esp32-hal-log.h>
+#include <esp_log.h>
 
-namespace esp32_c3_utils
+namespace
+{
+    constexpr auto TAG = "eFuse"; ///< Тег для логирования
+}
+
+namespace esp32_c3::utils
 {
     std::string readUserData() noexcept
     {
-        std::array<char, EFUSE_USER_DATA_SIZE> buffer{};
+        std::array<uint8_t, EFUSE_USER_DATA_SIZE> buffer{};
 
-        // Чтение данных (размер в битах!)
         esp_efuse_read_field_blob(ESP_EFUSE_USER_DATA,
                                   buffer.data(),
                                   buffer.size() * 8);
 
-        return {buffer.data(), strnlen(buffer.data(), buffer.size())};
+        const auto it = std::ranges::find(buffer, uint8_t{0});
+        return std::string{
+            reinterpret_cast<const char*>(buffer.data()),
+            static_cast<size_t>(std::distance(buffer.begin(), it))
+        };
     }
 
     bool writeUserData(const std::string& data) noexcept
     {
         if (data.empty() || data.size() > EFUSE_USER_DATA_SIZE)
         {
-            log_e("EFUSE", "Invalid data size: %zu", data.size());
+            ESP_LOGE(TAG, "Недопустимый размер данных: %zu", data.size());
             return false;
         }
 
         if (isUserDataWritten())
         {
-            log_w("EFUSE", "USER_DATA already written");
+            ESP_LOGW(TAG, "USER_DATA уже записан");
             return false;
         }
 
-        // Запись данных (размер указывается в битах!)
+        // Запись данных (размер в битах)
         const esp_err_t err = esp_efuse_write_field_blob(
             ESP_EFUSE_USER_DATA,
             data.data(),
@@ -41,11 +51,11 @@ namespace esp32_c3_utils
 
         if (err != ESP_OK)
         {
-            log_e("EFUSE", "Write failed: 0x%X", err);
+            ESP_LOGE(TAG, "Ошибка записи: 0x%X", err);
             return false;
         }
 
-        log_i("EFUSE", "Written %zu bytes to USER_DATA", data.size());
+        ESP_LOGI(TAG, "Записано %zu байт в USER_DATA", data.size());
         return true;
     }
 
@@ -53,4 +63,4 @@ namespace esp32_c3_utils
     {
         return esp_efuse_read_field_bit(ESP_EFUSE_USER_DATA);
     }
-} // namespace esp32_c3_utils
+} // namespace esp32_c3::utils

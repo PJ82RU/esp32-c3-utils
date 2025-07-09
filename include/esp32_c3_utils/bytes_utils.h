@@ -1,9 +1,10 @@
 #ifndef ESP32_C3_BYTES_UTILS_H
 #define ESP32_C3_BYTES_UTILS_H
 
-#include <Arduino.h>
+#include <cstdint>
+#include <string>
 
-namespace esp32_c3_utils
+namespace esp32_c3::utils
 {
     /**
      * @brief Конвертирует массив байт в HEX-строку
@@ -21,7 +22,7 @@ namespace esp32_c3_utils
      * @param size Размер массива
      * @return true в случае успеха
      */
-    bool hexToBytes(const String& hex, uint8_t* bytes, size_t size) noexcept;
+    bool hexToBytes(const std::string& hex, uint8_t* bytes, size_t size) noexcept;
 
     /**
      * @brief Сравнивает два массива байт
@@ -37,7 +38,7 @@ namespace esp32_c3_utils
      * @param value Исходное значение
      * @return Значение с переставленными байтами
      */
-    constexpr uint16_t swapBytes(uint16_t value) noexcept;
-} // namespace esp32_c3_utils
+    uint16_t swapBytes(uint16_t value) noexcept;
+} // namespace esp32_c3::utils
 
 #endif // ESP32_C3_BYTES_UTILS_H

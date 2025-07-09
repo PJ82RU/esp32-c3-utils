@@ -1,6 +1,6 @@
 #include "esp32_c3_objects/simple_callback.h"
 
-namespace esp32_c3_objects
+namespace esp32_c3::objects
 {
     SimpleCallback::SimpleCallback(const CallbackFunction callback, void* params) noexcept
         : mCallback(callback),
@@ -32,4 +32,4 @@ namespace esp32_c3_objects
     {
         return mCallback != nullptr;
     }
-} // namespace esp32_c3_utils
+} // namespace esp32_c3::utils

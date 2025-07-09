@@ -7,8 +7,9 @@
  */
 
 #include <array>
+#include <cstring>
 
-namespace esp32_c3_utils
+namespace esp32_c3::utils
 {
     /// Размер SHA-256 хеша в байтах
     constexpr size_t SHA256_SIZE = 32;
@@ -53,6 +54,6 @@ namespace esp32_c3_utils
                        const uint8_t (&iv)[AES_BLOCK_SIZE],
                        uint8_t* data,
                        size_t size) noexcept;
-} // namespace esp32_c3_utils
+} // namespace esp32_c3::utils
 
 #endif //ESP32_C3_CRYPTO_UTILS_H

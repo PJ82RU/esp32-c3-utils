@@ -8,7 +8,7 @@
 
 #include <driver/gpio.h>
 
-namespace esp32_c3_utils
+namespace esp32_c3::utils
 {
     /**
      * @brief Режимы пробуждения
@@ -45,6 +45,6 @@ namespace esp32_c3_utils
      * @return WakeupSource
      */
     WakeupSource getWakeupCause() noexcept;
-} // namespace esp32_c3_utils
+} // namespace esp32_c3::utils
 
 #endif //ESP32_C3_SLEEP_UTILS_H

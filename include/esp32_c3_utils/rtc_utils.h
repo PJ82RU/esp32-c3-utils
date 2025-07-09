@@ -8,7 +8,7 @@
 
 #include <cstddef>
 
-namespace esp32_c3_utils
+namespace esp32_c3::utils
 {
     /// Размер RTC медленной памяти (8KB для ESP32-C3)
     constexpr size_t RTC_SLOW_MEM_SIZE = 8 * 1024;
@@ -38,6 +38,6 @@ namespace esp32_c3_utils
      * @param size Количество байт для очистки
      */
     void clearRtcMemory(size_t offset, size_t size) noexcept;
-} // namespace esp32_c3_utils
+} // namespace esp32_c3::utils
 
 #endif //ESP32_C3_RTC_UTILS_H

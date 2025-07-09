@@ -2,11 +2,12 @@
 #define ESP32_C3_UTILS_CALLBACK_H
 
 #include "thread.h"
-#include "semaphore.h"
 #include "queue.h"
 #include "simple_callback.h"
+#include <mutex>
+#include <cstring>
 
-namespace esp32_c3_objects
+namespace esp32_c3::objects
 {
     /**
      * @brief Класс для управления callback-функциями с буферизацией данных
@@ -14,6 +15,15 @@ namespace esp32_c3_objects
     class Callback
     {
     public:
+        /// @brief Размер стека задачи по умолчанию (в байтах)
+        static constexpr uint32_t DEFAULT_STACK_DEPTH = 3072;
+
+        /// @brief Приоритет задачи по умолчанию
+        static constexpr UBaseType_t DEFAULT_PRIORITY = 18;
+
+        /// @brief Тег для логирования
+        static constexpr auto TAG = "Callback";
+
         /**
          * @brief Тип функции callback
          * @param arg1 Указатель на данные
@@ -49,11 +59,11 @@ namespace esp32_c3_objects
          * @param stackDepth Размер стека задачи (по умолчанию 3072)
          * @param priority Приоритет задачи (по умолчанию 18)
          */
-        Callback(uint8_t bufferSize,
-                 size_t itemSize,
-                 const char* name,
-                 uint32_t stackDepth = 3072,
-                 UBaseType_t priority = 18);
+        explicit [[nodiscard]] Callback(uint8_t bufferSize,
+                                        size_t itemSize,
+                                        const char* name,
+                                        uint32_t stackDepth = DEFAULT_STACK_DEPTH,
+                                        UBaseType_t priority = DEFAULT_PRIORITY) noexcept;
 
         /// @brief Деструктор (освобождает ресурсы)
         ~Callback();
@@ -132,8 +142,8 @@ namespace esp32_c3_objects
         /// Очередь для хранения заданий
         Queue mQueue;
 
-        /// Семафор для синхронизации
-        Semaphore mSemaphore;
+        /// Мьютекс для синхронизации
+        mutable std::mutex mMutex;
 
         /// Количество зарегистрированных callback-функций
         uint8_t mNumItems = 0;
@@ -153,6 +163,6 @@ namespace esp32_c3_objects
         /// Буфер для хранения данных
         uint8_t* mBuffer = nullptr;
     };
-} // namespace esp32_c3_utils
+} // namespace esp32_c3::objects
 
 #endif // ESP32_C3_UTILS_CALLBACK_H

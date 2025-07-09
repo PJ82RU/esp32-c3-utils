@@ -1,6 +1,6 @@
 #include "esp32_c3_utils/bytes_utils.h"
 
-namespace esp32_c3_utils
+namespace esp32_c3::utils
 {
     std::string bytesToHex(const uint8_t* bytes, const size_t size, const bool upperCase) noexcept
     {
@@ -59,8 +59,8 @@ namespace esp32_c3_utils
         return true;
     }
 
-    constexpr uint16_t swapBytes(const uint16_t value) noexcept
+    uint16_t swapBytes(const uint16_t value) noexcept
     {
         return (value << 8) | (value >> 8);
     }
-} // namespace esp32_c3_utils
+} // namespace esp32_c3::utils

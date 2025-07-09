@@ -1,30 +1,29 @@
 #include "esp32_c3_objects/callback.h"
-#include <cstring>
+#include <esp_log.h>
 
-namespace esp32_c3_objects
+namespace esp32_c3::objects
 {
     Callback::Callback(const uint8_t bufferSize,
                        const size_t itemSize,
                        const char* name,
                        const uint32_t stackDepth,
-                       const UBaseType_t priority) :
+                       const UBaseType_t priority) noexcept :
         mThread(name, stackDepth, priority),
         mQueue(bufferSize, sizeof(BufferItem)),
-        mSemaphore(false)
+        mBufferSize(bufferSize),
+        mItemSize(itemSize),
+        mBuffer((bufferSize > 0 && itemSize > 0 && bufferSize < SIZE_MAX / itemSize)
+                    ? new(std::nothrow) uint8_t[bufferSize * itemSize]
+                    : nullptr)
     {
-        if (bufferSize > 0 && itemSize > 0)
+        if (mBuffer)
         {
-            mBufferSize = bufferSize;
-            mItemSize = itemSize;
-            mBuffer = new(std::nothrow) uint8_t[mBufferSize * mItemSize];
-
-            if (mBuffer)
-            {
-                log_i("Initialized with buffer %dx%d", mBufferSize, mItemSize);
-                return;
-            }
+            ESP_LOGI(TAG, "Initialized with buffer %dx%d", mBufferSize, mItemSize);
         }
-        log_e("Invalid initialization parameters");
+        else if (bufferSize > 0 && itemSize > 0)
+        {
+            ESP_LOGE(TAG, "Memory allocation failed");
+        }
     }
 
     Callback::~Callback()
@@ -58,67 +57,64 @@ namespace esp32_c3_objects
     {
         if (!isInitialized() || !func) return -1;
 
-        if (mSemaphore.take())
+        std::lock_guard lock(mMutex);
+        for (int16_t i = 0; i < mNumItems; ++i)
         {
-            for (int16_t i = 0; i < mNumItems; ++i)
+            if (!mItems[i].func)
             {
-                if (!mItems[i].func)
-                {
-                    mItems[i] = {onlyIndex, func, params};
-                    (void)mSemaphore.give();
-                    log_d("Added callback at index %d", i);
-                    return i;
-                }
+                mItems[i] = {onlyIndex, func, params};
+                ESP_LOGD(TAG, "Added callback at index %d", i);
+                return i;
             }
-            (void)mSemaphore.give();
         }
 
-        log_w("No free slots for callback");
+        ESP_LOGW(TAG, "No free slots for callback");
         return -1;
     }
 
     void Callback::free() const noexcept
     {
-        if (isInitialized() && mSemaphore.take())
+        if (isInitialized())
         {
+            std::lock_guard lock(mMutex);
             std::memset(mItems, 0, sizeof(Item) * mNumItems);
-            (void)mSemaphore.give();
-            log_d("Cleared all callbacks");
+            ESP_LOGD(TAG, "Cleared all callbacks");
         }
     }
 
     void Callback::invoke(const void* value, const int16_t index) noexcept
     {
-        if (!mBuffer || !value || !mSemaphore.take()) return;
+        if (!mBuffer || !value) return;
 
-        std::memcpy(&mBuffer[mCurrentBufferIndex * mItemSize], value, mItemSize);
+        {
+            std::lock_guard lock(mMutex);
+            std::memcpy(&mBuffer[mCurrentBufferIndex * mItemSize], value, mItemSize);
 
-        const BufferItem item{index, mCurrentBufferIndex};
-        mCurrentBufferIndex = (mCurrentBufferIndex + 1) % mBufferSize;
+            const BufferItem item{index, mCurrentBufferIndex};
+            mCurrentBufferIndex = (mCurrentBufferIndex + 1) % mBufferSize;
 
-        (void)mQueue.send(&item);
-        (void)mSemaphore.give();
+            (void)mQueue.send(&item);
+        }
     }
 
     bool Callback::read(void* value) const noexcept
     {
-        if (!mBuffer || !value || !mSemaphore.take()) return false;
+        if (!mBuffer || !value) return false;
 
         BufferItem item{};
         const bool result = mQueue.receive(&item, 0);
         if (result)
         {
+            std::lock_guard lock(mMutex);
             std::memcpy(value, &mBuffer[item.bufferIndex * mItemSize], mItemSize);
         }
 
-        (void)mSemaphore.give();
         return result;
     }
 
     void Callback::callbackTask(void* arg) noexcept
     {
-        const auto* cb = static_cast<Callback*>(arg);
-        if (cb)
+        if (const auto* cb = static_cast<Callback*>(arg))
         {
             cb->run();
         }
@@ -127,21 +123,17 @@ namespace esp32_c3_objects
     void Callback::processItems(const BufferItem& item) const noexcept
     {
         const size_t pos = item.bufferIndex * mItemSize;
+        std::lock_guard lock(mMutex);
 
-        if (mSemaphore.take())
+        for (uint8_t i = 0; i < mNumItems; ++i)
         {
-            for (uint8_t i = 0; i < mNumItems; ++i)
+            if (const auto& [onlyIndex, func, params] = mItems[i]; func && (!onlyIndex || item.itemIndex == i))
             {
-                const Item& it = mItems[i];
-                if (it.func && (!it.onlyIndex || it.onlyIndex && item.itemIndex == i))
+                if (void* currentData = &mBuffer[pos]; func(currentData, params))
                 {
-                    if (it.func(&mBuffer[pos], it.params))
-                    {
-                        parentCallback.invoke(&mBuffer[pos]);
-                    }
+                    parentCallback.invoke(currentData);
                 }
             }
-            (void)mSemaphore.give();
         }
     }
 
@@ -153,4 +145,4 @@ namespace esp32_c3_objects
             processItems(item);
         }
     }
-} // namespace esp32_c3_utils
+} // namespace esp32_c3::objects

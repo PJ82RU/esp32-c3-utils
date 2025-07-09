@@ -1,18 +1,19 @@
 #include "esp32_c3_objects/queue.h"
-#include <stdexcept>
-#include <esp_log.h>
 
-namespace esp32_c3_objects
+#include <stdexcept>
+#include <utility>
+
+namespace esp32_c3::objects
 {
     Queue::Queue(const UBaseType_t queueLength, const UBaseType_t itemSize)
     {
         mHandle = xQueueCreate(queueLength, itemSize);
         if (mHandle == nullptr)
         {
-            log_e("Failed to create queue");
+            ESP_LOGE(TAG, "Failed to create queue (length=%u, itemSize=%u)", queueLength, itemSize);
             throw std::runtime_error("Failed to create queue");
         }
-        log_d("Queue created, length=%u, itemSize=%u", queueLength, itemSize);
+        ESP_LOGD(TAG, "Queue created (length=%u, itemSize=%u)", queueLength, itemSize);
     }
 
     Queue::~Queue() noexcept
@@ -21,9 +22,8 @@ namespace esp32_c3_objects
     }
 
     Queue::Queue(Queue&& other) noexcept
-        : mHandle(other.mHandle)
+        : mHandle(std::exchange(other.mHandle, nullptr))
     {
-        other.mHandle = nullptr;
     }
 
     Queue& Queue::operator=(Queue&& other) noexcept
@@ -31,53 +31,52 @@ namespace esp32_c3_objects
         if (this != &other)
         {
             cleanup();
-            mHandle = other.mHandle;
-            other.mHandle = nullptr;
+            mHandle = std::exchange(other.mHandle, nullptr);
         }
         return *this;
     }
 
     void Queue::cleanup() noexcept
     {
-        if (mHandle)
+        if (mHandle != nullptr)
         {
             vQueueDelete(mHandle);
             mHandle = nullptr;
-            log_d("Queue deleted");
+            ESP_LOGD(TAG, "Queue deleted");
         }
     }
 
     UBaseType_t Queue::messagesWaiting() const noexcept
     {
-        return mHandle ? uxQueueMessagesWaiting(mHandle) : 0;
+        return mHandle != nullptr ? uxQueueMessagesWaiting(mHandle) : 0;
     }
 
     UBaseType_t Queue::spacesAvailable() const noexcept
     {
-        return mHandle ? uxQueueSpacesAvailable(mHandle) : 0;
+        return mHandle != nullptr ? uxQueueSpacesAvailable(mHandle) : 0;
     }
 
     bool Queue::send(const void* item, const TickType_t ticksToWait) const noexcept
     {
-        return mHandle && (xQueueSend(mHandle, item, ticksToWait) == pdTRUE);
+        return mHandle != nullptr && (xQueueSend(mHandle, item, ticksToWait) == pdTRUE);
     }
 
     bool Queue::overwrite(const void* item) const noexcept
     {
-        return mHandle && (xQueueOverwrite(mHandle, item) == pdTRUE);
+        return mHandle != nullptr && (xQueueOverwrite(mHandle, item) == pdTRUE);
     }
 
     bool Queue::receive(void* buffer, const TickType_t ticksToWait) const noexcept
     {
-        return mHandle && (xQueueReceive(mHandle, buffer, ticksToWait) == pdTRUE);
+        return mHandle != nullptr && (xQueueReceive(mHandle, buffer, ticksToWait) == pdTRUE);
     }
 
     void Queue::reset() const noexcept
     {
-        if (mHandle)
+        if (mHandle != nullptr)
         {
             xQueueReset(mHandle);
-            log_d("Queue reset");
+            ESP_LOGD(TAG, "Queue reset");
         }
     }
-} // namespace esp32_c3_utils
+} // namespace esp32_c3::objects

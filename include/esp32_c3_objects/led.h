@@ -1,9 +1,11 @@
 #ifndef ESP32_C3_UTILS_LED_H
 #define ESP32_C3_UTILS_LED_H
 
-#include <Arduino.h>
+#include <driver/gpio.h>
+#include <esp_log.h>
+#include <esp_timer.h>
 
-namespace esp32_c3_objects
+namespace esp32_c3::objects
 {
     /**
      * @brief Режимы работы светодиода
@@ -18,11 +20,19 @@ namespace esp32_c3_objects
     };
 
     /**
-     * @brief Класс для управления светодиодом
+     * @brief Класс для управления светодиодом с активным низким уровнем
+     *
+     * @details Поддерживает различные режимы работы светодиода:
+     * - Постоянное включение/выключение
+     * - Различные варианты мигания
+     * - Автоматическое обновление состояния
+     * - Использует системный таймер ESP-IDF для временных интервалов
      */
     class Led
     {
     public:
+        static constexpr auto TAG = "LED"; ///< Тег для логирования
+
         /**
          * @brief Конструктор объекта светодиода
          * @param pin Номер GPIO пина (по умолчанию GPIO_NUM_NC)
@@ -43,27 +53,37 @@ namespace esp32_c3_objects
 
         /**
          * @brief Обновление состояния светодиода согласно текущему режиму
-         * @param currentTime Текущее время в миллисекундах (0 - использовать millis())
+         * @param currentTime Текущее время в микросекундах (0 - использовать esp_timer_get_time())
          */
-        void update(uint32_t currentTime = 0) noexcept;
+        void update(uint64_t currentTime = esp_timer_get_time()) noexcept;
 
-        /// Интервал мигания в миллисекундах
-        uint16_t blinkInterval = 500;
+        uint16_t blinkInterval = 500; ///< Интервал мигания в миллисекундах
 
     private:
-        /// Приватные методы
+        /**
+         * @brief Обновление физического состояния вывода GPIO
+         */
         void updateOutput() const noexcept;
 
-        /// Переменные
+        /**
+         * @brief Конвертирует миллисекунды в микросекунды
+         * @param ms Время в миллисекундах
+         * @return Время в микросекундах
+         */
+        static constexpr uint64_t msToUs(const uint32_t ms) noexcept
+        {
+            return static_cast<uint64_t>(ms) * 1000;
+        }
+
         // Примитивные типы
         bool mIsOn = false;       ///< Флаг текущего состояния светодиода
         uint8_t mStep = 0;        ///< Текущий шаг в последовательности мигания
-        uint32_t mNextUpdate = 0; ///< Время следующего обновления состояния
+        uint64_t mNextUpdate = 0; ///< Время следующего обновления состояния (в микросекундах)
 
         // Пользовательские типы
         gpio_num_t mPin = GPIO_NUM_NC; ///< Номер GPIO пина светодиода
         LedMode mMode = LedMode::OFF;  ///< Текущий режим работы
     };
-} // namespace esp32_c3_utils
+} // namespace esp32_c3::objects
 
 #endif // ESP32_C3_UTILS_LED_H

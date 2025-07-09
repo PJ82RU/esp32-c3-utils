@@ -3,61 +3,56 @@
 
 /**
  * @file system_info.h
- * @brief Системная информация ESP32-C3
+ * @brief Получение системной информации ESP32-C3
  */
 
 #include <cstdint>
-#include <cstring>
+#include <array>
 
-namespace esp32_c3_utils
+namespace esp32_c3::utils
 {
-    constexpr size_t CHIP_MODEL_LEN = 32; ///< Макс. длина модели чипа
-    constexpr size_t SDK_VERSION_LEN = 8; ///< Макс. версия SDK
-    constexpr size_t SKETCH_MD5_LEN = 16; ///< Длина MD5 (16 байт)
+    ///< Максимальная длина строки модели чипа
+    constexpr size_t CHIP_MODEL_LEN = 32;
+    ///< Максимальная длина версии SDK
+    constexpr size_t SDK_VERSION_LEN = 8;
+    ///< Длина MD5-хеша приложения
+    constexpr size_t SKETCH_MD5_LEN = 16;
 
     /**
      * @brief Структура системной информации
-     * @note Оптимизированное выравнивание и сортировка полей
+     * @details Оптимизирована по выравниванию и размеру
      */
 #pragma pack(push, 1)
     struct SystemInfo
     {
-        // 64-битные поля (выравнивание 8)
+        uint32_t cpuFreqMhz;     ///< Частота CPU в МГц
+        uint32_t cycleCount;     ///< Счетчик циклов процессора
+        uint32_t flashChipSize;  ///< Размер Flash-памяти в байтах
+        uint32_t flashChipSpeed; ///< Частота Flash в МГц
+        uint32_t freeHeap;       ///< Свободная heap-память в байтах
+        uint32_t heapSize;       ///< Общий размер heap-памяти
+        uint32_t sketchSize;     ///< Размер прошивки в байтах
+        uint8_t chipCores;       ///< Количество ядер процессора
+        uint8_t chipRevision;    ///< Ревизия чипа
+
         union
         {
-            uint64_t efuseMac;   ///< MAC как uint64_t
-            uint8_t macArray[6]; ///< MAC как массив байт + 2 байта padding
+            uint64_t efuseMac;               ///< MAC-адрес в uint64_t
+            std::array<uint8_t, 6> macArray; ///< MAC-адрес в виде массива
         };
 
-        // 32-битные поля (выравнивание 4)
-        uint32_t cpuFreqMhz;     ///< Частота CPU (МГц)
-        uint32_t cycleCount;     ///< Счетчик циклов
-        uint32_t flashChipSize;  ///< Размер flash (байт)
-        uint32_t flashChipSpeed; ///< Частота flash (МГц)
-        uint32_t freeHeap;       ///< Свободная heap-память (байт)
-        uint32_t heapSize;       ///< Общий размер heap (байт)
-        uint32_t sketchSize;     ///< Размер скетча (байт)
-
-        // 16-битные поля (выравнивание 2)
-        int16_t chipTemperature; ///< Температура (°C * 100)
-
-        // 8-битные поля
-        uint8_t chipCores;    ///< Количество ядер (1 или 2)
-        uint8_t chipRevision; ///< Ревизия чипа
-
-        // Строковые поля (выравнивание 1)
-        char chipModel[CHIP_MODEL_LEN];   ///< Модель чипа
-        char sdkVersion[SDK_VERSION_LEN]; ///< Версия SDK
-        char sketchMd5[SKETCH_MD5_LEN];   ///< MD5 скетча
+        std::array<char, CHIP_MODEL_LEN> chipModel;    ///< Модель чипа
+        std::array<char, SDK_VERSION_LEN> sdkVersion;  ///< Версия SDK
+        std::array<uint8_t, SKETCH_MD5_LEN> sketchMd5; ///< MD5-хеш прошивки
     };
 #pragma pack(pop)
 
     /**
-     * @brief Заполнить структуру системной информацией
-     * @param[out] info Ссылка на структуру
-     * @return true в случае успеха
+     * @brief Получить системную информацию
+     * @param[out] info Ссылка на структуру для заполнения
+     * @return true если данные успешно получены
+     * @note Функция не бросает исключений (noexcept)
      */
     bool getSystemInfo(SystemInfo& info) noexcept;
-} // namespace esp32_c3_utils
-
-#endif //ESP32_C3_UTILS_SYSTEM_INFO_H
+} // namespace esp32_c3::utils
+#endif // ESP32_C3_UTILS_SYSTEM_INFO_H

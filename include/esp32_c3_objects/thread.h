@@ -1,9 +1,14 @@
 #ifndef ESP32_C3_UTILS_THREAD_H
 #define ESP32_C3_UTILS_THREAD_H
 
-#include <Arduino.h>
+#include <cstdint>
+#include <array>
+#include <string_view>
+#include <esp_log.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
-namespace esp32_c3_objects
+namespace esp32_c3::objects
 {
     /**
      * @brief Максимальная длина имени потока (включая нуль-терминатор)
@@ -14,25 +19,31 @@ namespace esp32_c3_objects
      * @brief Класс-обертка для работы с задачами FreeRTOS
      *
      * @details Предоставляет удобный интерфейс для создания и управления задачами,
-     * включая контроль стека, приоритетов и привязку к ядрам процессора
+     * включая контроль стека, приоритетов и привязку к ядрам процессора.
+     * Поддерживает ESP-IDF v5+ и использует возможности C++17.
      */
     class Thread
     {
     public:
+        /// Тег для логирования
+        static constexpr auto TAG = "Thread";
+
         /**
          * @brief Конструктор задачи FreeRTOS
          * @param name Имя задачи (максимум 31 символ + нуль-терминатор)
          * @param stackDepth Размер стека в словах (4 байта на слово)
          * @param priority Приоритет задачи (0 - самый низкий)
          */
-        Thread(const char* name, uint32_t stackDepth, UBaseType_t priority) noexcept;
+        explicit Thread(std::string_view name, uint32_t stackDepth, UBaseType_t priority) noexcept;
 
         /// @brief Деструктор - автоматически останавливает задачу
         ~Thread() noexcept;
 
-        // Запрещаем копирование
+        // Запрещаем копирование и перемещение
         Thread(const Thread&) = delete;
+        Thread(Thread&&) = delete;
         Thread& operator=(const Thread&) = delete;
+        Thread& operator=(Thread&&) = delete;
 
         /**
          * @brief Запуск задачи на любом доступном ядре
@@ -78,7 +89,7 @@ namespace esp32_c3_objects
          * @brief Получение размера стека задачи
          * @return Размер стека в словах (4 байта на слово)
          */
-        [[nodiscard]] uint32_t stackSize() const noexcept;
+        [[nodiscard]] uint32_t stackSize() const noexcept { return mStackDepth; }
 
         /**
          * @brief Получение минимального свободного места в стеке
@@ -87,19 +98,23 @@ namespace esp32_c3_objects
          */
         [[nodiscard]] UBaseType_t stackHighWaterMark() const noexcept;
 
+        /**
+         * @brief Получение имени задачи
+         * @return Указатель на имя задачи
+         */
+        [[nodiscard]] const char* name() const noexcept { return mName.data(); }
+
     private:
-        /// Хэндл задачи FreeRTOS
-        TaskHandle_t mHandle = nullptr;
+        /// Примитивные типы
+        uint32_t mStackDepth;  ///< Запрошенный размер стека
+        UBaseType_t mPriority; ///< Приоритет задачи
 
-        /// Имя задачи (для отладки)
-        char mName[THREAD_NAME_SIZE] = {};
+        /// Контейнеры
+        std::array<char, THREAD_NAME_SIZE> mName{}; ///< Имя задачи (для отладки)
 
-        /// Запрошенный размер стека
-        uint32_t mStackDepth = 0;
-
-        /// Приоритет задачи
-        UBaseType_t mPriority = 0;
+        /// Указатели
+        TaskHandle_t mHandle = nullptr; ///< Хэндл задачи FreeRTOS
     };
-} // namespace esp32_c3_utils
+} // namespace esp32_c3::objects
 
 #endif // ESP32_C3_UTILS_THREAD_H

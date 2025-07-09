@@ -2,7 +2,7 @@
 #include <cstdio>
 #include <cstring>
 
-namespace esp32_c3_utils
+namespace esp32_c3::utils
 {
     void formatTime(char* buffer, unsigned long time, const bool showDay,
                     const bool showHour, const bool showMinute, const bool showSecond) noexcept
@@ -27,8 +27,7 @@ namespace esp32_c3_utils
         // Форматирование дней
         if (showDay && days > 0)
         {
-            const int written = snprintf(ptr, 4, "%u", days);
-            if (written > 0)
+            if (const int written = snprintf(ptr, 4, "%u", days); written > 0)
             {
                 ptr += written;
                 needSeparator = showHour || showMinute || showSecond;
@@ -42,8 +41,7 @@ namespace esp32_c3_utils
         // Форматирование часов
         if (showHour)
         {
-            const int written = snprintf(ptr, 3, "%02u", hours);
-            if (written > 0)
+            if (const int written = snprintf(ptr, 3, "%02u", hours); written > 0)
             {
                 ptr += written;
                 needSeparator = showMinute || showSecond;
@@ -57,8 +55,7 @@ namespace esp32_c3_utils
         // Форматирование минут
         if (showMinute)
         {
-            const int written = snprintf(ptr, 3, "%02u", minutes);
-            if (written > 0)
+            if (const int written = snprintf(ptr, 3, "%02u", minutes); written > 0)
             {
                 ptr += written;
                 if (showSecond)
@@ -78,4 +75,4 @@ namespace esp32_c3_utils
         // Гарантированное завершение строки
         *ptr = '\0';
     }
-} // namespace esp32_c3_utils
+} // namespace esp32_c3::utils

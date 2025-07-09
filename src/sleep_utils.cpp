@@ -1,40 +1,40 @@
 #include "esp32_c3_utils/sleep_utils.h"
-#include <esp32-hal-log.h>
-#include <esp_sleep.h>
-#include <driver/rtc_io.h>
+#include "esp_log.h"
+#include "driver/rtc_io.h"
+#include "esp_sleep.h"
 
-namespace esp32_c3_utils
+namespace esp32_c3::utils
 {
     void deepSleep(const uint64_t sleepDurationMs,
                    const WakeupSource wakeupSrc,
                    const GpioWakeupConfig gpioCfg) noexcept
     {
-        // Настройка таймера (если указано время)
+        // Настройка пробуждения по таймеру
         if (sleepDurationMs > 0)
         {
             esp_sleep_enable_timer_wakeup(sleepDurationMs * 1000);
-            log_d("Timer wakeup set for %llu ms", sleepDurationMs);
+            ESP_LOGD("Sleep", "Timer wakeup set for %llu ms", sleepDurationMs);
         }
 
-        // Настройка GPIO wakeup (ESP32-C3 использует esp_sleep_enable_gpio_wakeup)
+        // Настройка пробуждения по GPIO
         if (wakeupSrc == WakeupSource::GPIO && gpioCfg.pin != GPIO_NUM_NC)
         {
             if (rtc_gpio_is_valid_gpio(gpioCfg.pin))
             {
-                esp_sleep_enable_gpio_wakeup(); // Активируем GPIO wakeup
+                esp_sleep_enable_gpio_wakeup();
                 gpio_wakeup_enable(gpioCfg.pin,
                                    gpioCfg.activeLow ? GPIO_INTR_LOW_LEVEL : GPIO_INTR_HIGH_LEVEL);
-                log_d("GPIO wakeup on pin %d (%s)",
-                      gpioCfg.pin,
-                      gpioCfg.active_low ? "LOW" : "HIGH");
+                ESP_LOGD("Sleep", "GPIO wakeup on pin %d (%s)",
+                         gpioCfg.pin,
+                         gpioCfg.activeLow ? "LOW" : "HIGH");
             }
             else
             {
-                log_e("GPIO%d not RTC capable", gpioCfg.pin);
+                ESP_LOGE("Sleep", "GPIO%d is not RTC capable", gpioCfg.pin);
             }
         }
 
-        log_i("Entering deep sleep");
+        ESP_LOGI("Sleep", "Entering deep sleep");
         esp_deep_sleep_start();
     }
 
@@ -48,4 +48,4 @@ namespace esp32_c3_utils
         default: return WakeupSource::TIMER;
         }
     }
-} // namespace esp32_c3_utils
+} // namespace esp32_c3::utils

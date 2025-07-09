@@ -1,7 +1,7 @@
 #ifndef ESP32_C3_UTILS_SIMPLE_CALLBACK_H
 #define ESP32_C3_UTILS_SIMPLE_CALLBACK_H
 
-namespace esp32_c3_objects
+namespace esp32_c3::objects
 {
     /**
      * @brief Класс для работы с простыми callback-функциями C-стиля
@@ -59,6 +59,6 @@ namespace esp32_c3_objects
         /// Пользовательские параметры для callback
         void* mParams = nullptr;
     };
-} // namespace esp32_c3_utils
+} // namespace esp32_c3::utils
 
 #endif // ESP32_C3_UTILS_SIMPLE_CALLBACK_H

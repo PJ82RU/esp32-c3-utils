@@ -21,7 +21,6 @@
 #include "esp32_c3_objects/callback.h"
 #include "esp32_c3_objects/led.h"
 #include "esp32_c3_objects/queue.h"
-#include "esp32_c3_objects/semaphore.h"
 #include "esp32_c3_objects/simple_callback.h"
 #include "esp32_c3_objects/thread.h"
 

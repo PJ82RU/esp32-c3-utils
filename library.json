@@ -1,8 +1,8 @@
 {
   "name": "ESP32-C3 Utils",
   "version": "1.0.0",
-  "keywords": "esp32, c3, utilities, crypto, power, rtc, sleep",
-  "description": "Comprehensive utility library for ESP32-C3 with power management, crypto functions, RTC utilities and more",
+  "keywords": "esp32, c3, utilities, crypto, power, rtc, sleep, idf",
+  "description": "Comprehensive utility library for ESP32-C3 with ESP-IDF support. Includes power management, crypto functions, RTC utilities and system services",
   "repository": {
     "type": "git",
     "url": "https://github.com/PJ82RU/esp32-c3-utils.git"
@@ -14,41 +14,48 @@
       "maintainer": true
     }
   ],
-  "license": "Unlicense",
-  "frameworks": "arduino",
-  "platforms": "espressif32",
-  "headers": [
-    "esp32_c3_utils.h",
-    "bytes_utils.h",
-    "clock_utils.h",
-    "crypto_utils.h",
-    "power_utils.h",
-    "rtc_utils.h",
-    "sleep_utils.h",
-    "system_info.h",
-    "temp_sensor.h",
-    "core_dump.h",
-    "usr_data.h",
-    "callback.h",
-    "led.h",
-    "queue.h",
-    "semaphore.h",
-    "simple_callback.h",
-    "thread.h"
+  "license": "MIT",
+  "frameworks": [
+    "espidf",
+    "arduino"
   ],
-  "dependencies": {
-    "arduino-libraries/Arduino-ESP32": ">=2.0.0"
+  "platforms": "espressif32",
+  "build": {
+    "flags": [
+      "-I include",
+      "-D CONFIG_ESP32_C3_UTILS_ENABLE=1"
+    ],
+    "srcDir": "src",
+    "includeDir": "include"
   },
-  "examples": [
+  "export": {
+    "include": [
+      "include/esp32_c3_objects/callback.h",
+      "include/esp32_c3_objects/led.h",
+      "include/esp32_c3_objects/queue.h",
+      "include/esp32_c3_objects/simple_callback.h",
+      "include/esp32_c3_objects/thread.h",
+      "include/esp32_c3_utils/bytes_utils.h",
+      "include/esp32_c3_utils/clock_utils.h",
+      "include/esp32_c3_utils/core_dump.h",
+      "include/esp32_c3_utils/crypto_utils.h",
+      "include/esp32_c3_utils/power_utils.h",
+      "include/esp32_c3_utils/rtc_utils.h",
+      "include/esp32_c3_utils/sleep_utils.h",
+      "include/esp32_c3_utils/system_info.h",
+      "include/esp32_c3_utils/temp_sensor.h",
+      "include/esp32_c3_utils/usr_data.h"
+    ]
+  },
+  "dependencies": {
+    "espressif/esp-idf": "^5.1"
+  },
+  "targets": [
     {
-      "name": "Basic Usage",
-      "base": "examples/basic",
-      "files": ["basic.cpp"]
-    },
-    {
-      "name": "Power Management",
-      "base": "examples/power",
-      "files": ["power.cpp"]
+      "name": "esp32c3",
+      "frameworks": [
+        "espidf"
+      ]
     }
   ]
 }

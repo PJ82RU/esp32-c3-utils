@@ -1,9 +1,7 @@
 #ifndef ESP32_C3_CLOCK_UTILS_H
 #define ESP32_C3_CLOCK_UTILS_H
 
-#include <Arduino.h>
-
-namespace esp32_c3_utils
+namespace esp32_c3::utils
 {
     /**
      * @brief Форматирует время в читаемую строку
@@ -20,6 +18,6 @@ namespace esp32_c3_utils
                     bool showHour = true,
                     bool showMinute = true,
                     bool showSecond = true) noexcept;
-} // namespace esp32_c3_utils
+} // namespace esp32_c3::utils
 
 #endif // ESP32_C3_CLOCK_UTILS_H

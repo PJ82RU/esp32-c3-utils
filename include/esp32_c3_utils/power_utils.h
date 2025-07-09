@@ -8,7 +8,7 @@
 
 #include <driver/adc.h>
 
-namespace esp32_c3_utils
+namespace esp32_c3::utils
 {
     /**
      * @brief Доступные частоты CPU
@@ -53,6 +53,6 @@ namespace esp32_c3_utils
      * @param durationMs Длительность сна в мс (для LIGHT_SLEEP)
      */
     void enterPowerSave(PowerSaveMode mode, uint32_t durationMs = 0) noexcept;
-} // namespace esp32_c3_utils
+} // namespace esp32_c3::utils
 
 #endif //ESP32_C3_POWER_UTILS_H

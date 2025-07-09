@@ -1,7 +1,7 @@
 #include "esp32_c3_objects/led.h"
-#include <esp_log.h>
 
-namespace esp32_c3_objects
+
+namespace esp32_c3::objects
 {
     Led::Led(const gpio_num_t pin) noexcept
     {
@@ -10,46 +10,42 @@ namespace esp32_c3_objects
 
     void Led::init(const gpio_num_t pin) noexcept
     {
-        if (mPin == GPIO_NUM_NC && pin != GPIO_NUM_NC)
+        if (pin != mPin && pin != GPIO_NUM_NC)
         {
+            if (mPin != GPIO_NUM_NC)
+            {
+                // Освобождаем предыдущий пин если был инициализирован
+                gpio_reset_pin(mPin);
+            }
+
             mPin = pin;
-            pinMode(mPin, OUTPUT);
-            digitalWrite(mPin, HIGH);
-            log_d("Initialized pin %d", mPin);
+            gpio_set_direction(mPin, GPIO_MODE_OUTPUT);
+            gpio_set_level(mPin, 1); // Выключенное состояние (активный низкий)
+            ESP_LOGD(TAG, "LED initialized on pin %d", mPin);
         }
     }
 
-    void Led::setMode(const LedMode mode) noexcept
+    void Led::setMode(LedMode mode) noexcept
     {
-        mMode = mode;
-        mStep = 0;
-        mNextUpdate = 0;
-        updateOutput(); // Немедленное обновление состояния
-        log_i("Mode changed to %d", static_cast<int>(mode));
+        if (mMode != mode)
+        {
+            mMode = mode;
+            mStep = 0;
+            mNextUpdate = 0;
+            updateOutput();
+            ESP_LOGI(TAG, "Mode changed to %d", static_cast<int>(mode));
+        }
     }
 
-    void Led::update(uint32_t currentTime) noexcept
+    void Led::update(const uint64_t currentTime) noexcept
     {
-        if (mPin == GPIO_NUM_NC) return;
+        if (mPin == GPIO_NUM_NC || mMode == LedMode::OFF || mMode == LedMode::ON) return;
+        if (currentTime < mNextUpdate) return;
 
-        if (currentTime == 0)
-        {
-            currentTime = millis();
-        }
-
-        if (currentTime < mNextUpdate)
-        {
-            return;
-        }
-
-        uint16_t timeout = blinkInterval;
+        uint64_t timeout = msToUs(blinkInterval);
 
         switch (mMode)
         {
-        case LedMode::ON:
-            mIsOn = true;
-            break;
-
         case LedMode::BLINK:
             mIsOn = !mIsOn;
             mStep = mIsOn ? 1 : 0;
@@ -58,17 +54,17 @@ namespace esp32_c3_objects
         case LedMode::DOUBLE_BLINK:
             mIsOn = (mStep % 2) == 0;
             mStep = (mStep + 1) % 4;
-            timeout = blinkInterval / 2;
+            timeout = msToUs(blinkInterval) / 2;
             break;
 
         case LedMode::TRIPLE_BLINK:
             mIsOn = (mStep % 2) == 0;
             mStep = (mStep + 1) % 6;
-            timeout = blinkInterval / 3;
+            timeout = msToUs(blinkInterval) / 3;
             break;
 
-        default: // OFF
-            mIsOn = false;
+        default:
+            // Обработано в начале метода
             break;
         }
 
@@ -78,7 +74,10 @@ namespace esp32_c3_objects
 
     void Led::updateOutput() const noexcept
     {
-        digitalWrite(mPin, mIsOn ? LOW : HIGH);
-        log_d("Pin %d set to %s", mPin, mIsOn ? "LOW" : "HIGH");
+        if (mPin != GPIO_NUM_NC)
+        {
+            gpio_set_level(mPin, mIsOn ? 0 : 1); // Активный низкий уровень
+            ESP_LOGD(TAG, "Pin %d set to %s", mPin, mIsOn ? "ON" : "OFF");
+        }
     }
-} // namespace esp32_c3_utils
+} // namespace esp32_c3::objects
