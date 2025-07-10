@@ -59,7 +59,7 @@ namespace esp32_c3::objects
          * @param stackDepth Размер стека задачи (по умолчанию 3072)
          * @param priority Приоритет задачи (по умолчанию 18)
          */
-        explicit [[nodiscard]] Callback(uint8_t bufferSize,
+        explicit Callback(uint8_t bufferSize,
                                         size_t itemSize,
                                         const char* name,
                                         uint32_t stackDepth = DEFAULT_STACK_DEPTH,
