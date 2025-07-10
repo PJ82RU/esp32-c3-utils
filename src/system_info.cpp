@@ -1,5 +1,4 @@
 #include "esp32_c3_utils/system_info.h"
-#include "esp32_c3_utils/temp_sensor.h"
 
 #include <charconv>
 #include <string_view>

@@ -1,7 +1,6 @@
 // ReSharper disable CppDFAUnreachableCode
 #include "esp32_c3_utils/power_utils.h"
 #include "esp_pm.h"
-#include "driver/adc.h"
 #include "esp_sleep.h"
 #include "esp_log.h"
 
@@ -39,10 +38,31 @@ namespace esp32_c3::utils
             return 0.0f;
         }
 
-        adc1_config_width(ADC_WIDTH_BIT_12);
-        adc1_config_channel_atten(ADC1_CHANNEL_0, ADC_ATTEN_DB_12);
+        // 1. Инициализация ADC
+        adc_oneshot_unit_handle_t adc_handle;
+        constexpr adc_oneshot_unit_init_cfg_t init_config = {
+            .unit_id = ADC_UNIT_1,
+            .clk_src = ADC_DIGI_CLK_SRC_DEFAULT,
+            .ulp_mode = ADC_ULP_MODE_DISABLE,
+        };
+        ESP_ERROR_CHECK(adc_oneshot_new_unit(&init_config, &adc_handle));
 
-        const float voltage = static_cast<float>(adc1_get_raw(ADC1_CHANNEL_0)) * 3.3f / 4095.0f;
+        // 2. Конфигурация канала ADC
+        constexpr adc_oneshot_chan_cfg_t config = {
+            .atten = ADC_ATTEN_DB_12,
+            .bitwidth = ADC_BITWIDTH_12,
+        };
+        ESP_ERROR_CHECK(adc_oneshot_config_channel(adc_handle, ADC_CHANNEL_0, &config));
+
+        // 3. Получение сырого значения
+        int raw_value;
+        ESP_ERROR_CHECK(adc_oneshot_read(adc_handle, ADC_CHANNEL_0, &raw_value));
+
+        // 4. Очистка ресурсов
+        adc_oneshot_del_unit(adc_handle);
+
+        // 5. Конвертация в напряжение
+        const float voltage = static_cast<float>(raw_value) * 3.3f / 4095.0f;
         const float result = voltage * voltageDivider;
 
         ESP_LOGD("Power", "Battery voltage: %.2fV (raw: %.2fV)", result, voltage);

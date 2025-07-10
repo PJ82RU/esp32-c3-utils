@@ -6,7 +6,8 @@
  * @brief Утилиты для управления питанием ESP32-C3
  */
 
-#include <driver/adc.h>
+#include "driver/gpio.h"
+#include "esp_adc/adc_oneshot.h"
 
 namespace esp32_c3::utils
 {

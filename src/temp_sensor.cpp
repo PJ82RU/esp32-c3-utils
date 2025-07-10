@@ -1,71 +1,62 @@
-#include "esp32_c3_utils/temp_sensor.h"
+#include "esp32_c3_objects/temp_sensor.h"
 #include <esp_log.h>
+#include <esp_check.h>
 
-namespace
+namespace esp32_c3::objects
 {
-    constexpr auto TAG = "TempSensor";
-    bool g_tempSensorInitialized = false;
-}
-
-namespace esp32_c3::utils
-{
-    bool isTempSensorInitialized() noexcept
+    std::unique_ptr<TempSensor> TempSensor::create(const int rangeMin, const int rangeMax) noexcept
     {
-        return g_tempSensorInitialized;
-    }
-
-    esp_err_t initTempSensor(const temp_sensor_dac_offset_t dacOffset) noexcept
-    {
-        if (g_tempSensorInitialized)
-        {
-            ESP_LOGW(TAG, "Sensor already initialized");
-            return ESP_OK;
-        }
-
-        const temp_sensor_config_t tempSensorConfig = {
-            .dac_offset = dacOffset,
-            .clk_div = 6
+        temperature_sensor_handle_t handle = nullptr;
+        const temperature_sensor_config_t config = {
+            .range_min = rangeMin,
+            .range_max = rangeMax,
+            .clk_src = TEMPERATURE_SENSOR_CLK_SRC_DEFAULT
         };
 
-        esp_err_t err = temp_sensor_set_config(tempSensorConfig);
-        if (err != ESP_OK)
+        esp_err_t ret = temperature_sensor_install(&config, &handle);
+        if (ret != ESP_OK)
         {
-            ESP_LOGE(TAG, "Config failed: 0x%X", err);
-            return err;
+            ESP_LOGE(TAG, "Initialization failed: %s", esp_err_to_name(ret));
+            return nullptr;
         }
 
-        err = temp_sensor_start();
-        if (err != ESP_OK)
+        ret = temperature_sensor_enable(handle);
+        if (ret != ESP_OK)
         {
-            ESP_LOGE(TAG, "Start failed: 0x%X", err);
-            return err;
+            ESP_LOGE(TAG, "Activation failed: %s", esp_err_to_name(ret));
+            temperature_sensor_uninstall(handle);
+            return nullptr;
         }
 
-        g_tempSensorInitialized = true;
-        ESP_LOGI(TAG, "Initialized with dacOffset=%d", dacOffset);
-        return ESP_OK;
+        ESP_LOGI(TAG, "Sensor initialized (range: %d..%d°C)", rangeMin, rangeMax);
+        return std::unique_ptr<TempSensor>(new TempSensor(handle));
     }
 
-    esp_err_t getChipTemperature(float& temperature) noexcept
+    TempSensor::TempSensor(temperature_sensor_handle_t handle) noexcept
+        : mHandle(handle)
     {
-        if (!g_tempSensorInitialized)
-        {
-            ESP_LOGE(TAG, "Sensor not initialized");
-            return ESP_ERR_INVALID_STATE;
-        }
-
-        return temp_sensor_read_celsius(&temperature);
     }
 
-    void deinitTempSensor() noexcept
+    TempSensor::~TempSensor() noexcept
     {
-        if (!g_tempSensorInitialized)
+        if (mHandle)
         {
-            return;
+            ESP_ERROR_CHECK(temperature_sensor_disable(mHandle));
+            ESP_ERROR_CHECK(temperature_sensor_uninstall(mHandle));
+            ESP_LOGI(TAG, "Sensor deinitialized");
+        }
+    }
+
+    std::optional<float> TempSensor::read() const noexcept
+    {
+        float temp = 0.0f;
+
+        if (const esp_err_t ret = temperature_sensor_get_celsius(mHandle, &temp); ret != ESP_OK)
+        {
+            ESP_LOGE(TAG, "Read failed: %s", esp_err_to_name(ret));
+            return std::nullopt;
         }
 
-        temp_sensor_stop();
-        g_tempSensorInitialized = false;
-        ESP_LOGI(TAG, "Deinitialized");
+        return temp;
     }
-} // namespace esp32_c3::utils
+} // namespace esp32_c3::objects
