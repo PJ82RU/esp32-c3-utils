@@ -47,9 +47,6 @@
       "include/esp32_c3_utils/usr_data.h"
     ]
   },
-  "dependencies": {
-    "espressif/esp-idf": "^5.1"
-  },
   "targets": [
     {
       "name": "esp32c3",
