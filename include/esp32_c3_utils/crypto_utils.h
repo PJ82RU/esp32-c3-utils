@@ -9,6 +9,10 @@
 #include <array>
 #include <cstring>
 
+#ifndef MBEDTLS_CONFIG_FILE
+#define MBEDTLS_CONFIG_FILE "mbedtls/esp_config.h"
+#endif
+
 namespace esp32_c3::utils
 {
     /// Размер SHA-256 хеша в байтах

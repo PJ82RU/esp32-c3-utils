@@ -8,11 +8,11 @@
 
 #include <cstddef>
 
+#define RTC_SLOW_MEM_SIZE 8192  // 8KB для ESP32-C3
+#define RTC_SLOW_MEM ((uint8_t*)0x50000000)  // Адрес RTC slow memory
+
 namespace esp32_c3::utils
 {
-    /// Размер RTC медленной памяти (8KB для ESP32-C3)
-    constexpr size_t RTC_SLOW_MEM_SIZE = 8 * 1024;
-
     /**
      * @brief Записать данные в RTC-память
      * @param offset Смещение в RTC-памяти (байты)
