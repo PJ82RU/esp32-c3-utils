@@ -6,6 +6,7 @@
  * @brief Получение системной информации ESP32-C3
  */
 
+#include <cstddef>
 #include <cstdint>
 #include <array>
 

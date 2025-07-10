@@ -11,9 +11,11 @@ namespace esp32_c3::objects
         if (mHandle == nullptr)
         {
             ESP_LOGE(TAG, "Failed to create queue (length=%u, itemSize=%u)", queueLength, itemSize);
-            throw std::runtime_error("Failed to create queue");
         }
-        ESP_LOGD(TAG, "Queue created (length=%u, itemSize=%u)", queueLength, itemSize);
+        else
+        {
+            ESP_LOGD(TAG, "Queue created (length=%u, itemSize=%u)", queueLength, itemSize);
+        }
     }
 
     Queue::~Queue() noexcept
