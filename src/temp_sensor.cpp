@@ -10,7 +10,10 @@ namespace esp32_c3::objects
         const temperature_sensor_config_t config = {
             .range_min = rangeMin,
             .range_max = rangeMax,
-            .clk_src = TEMPERATURE_SENSOR_CLK_SRC_DEFAULT
+            .clk_src = TEMPERATURE_SENSOR_CLK_SRC_DEFAULT,
+            .flags = {
+                .allow_pd = false
+            }
         };
 
         esp_err_t ret = temperature_sensor_install(&config, &handle);
