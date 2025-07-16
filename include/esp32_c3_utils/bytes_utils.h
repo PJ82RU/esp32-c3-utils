@@ -24,21 +24,6 @@ namespace esp32_c3::utils
      */
     bool hexToBytes(const std::string& hex, uint8_t* bytes, size_t size) noexcept;
 
-    /**
-     * @brief Сравнивает два массива байт
-     * @param buf1 Первый массив
-     * @param buf2 Второй массив
-     * @param size Размер массивов
-     * @return true если массивы идентичны
-     */
-    bool compareBytes(const uint8_t* buf1, const uint8_t* buf2, size_t size) noexcept;
-
-    /**
-     * @brief Меняет местами байты в 16-битном значении
-     * @param value Исходное значение
-     * @return Значение с переставленными байтами
-     */
-    uint16_t swapBytes(uint16_t value) noexcept;
 } // namespace esp32_c3::utils
 
 #endif // ESP32_C3_BYTES_UTILS_H

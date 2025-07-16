@@ -2,65 +2,69 @@
 
 namespace esp32_c3::utils
 {
-    std::string bytesToHex(const uint8_t* bytes, const size_t size, const bool upperCase) noexcept
+    std::string bytesToHex(const uint8_t* bytes, const size_t size, const bool upperCase)
     {
         if (bytes == nullptr || size == 0)
         {
             return {};
         }
 
-        std::string result;
-        result.reserve(size * 2); // Оптимизация: предварительное выделение памяти
+        // Lookup-таблицы для быстрого преобразования
+        static constexpr auto kHexCharsLower = "0123456789abcdef";
+        static constexpr auto kHexCharsUpper = "0123456789ABCDEF";
+        const auto* hexChars = upperCase ? kHexCharsUpper : kHexCharsLower;
 
-        const char* hexChars = upperCase ? "0123456789ABCDEF" : "0123456789abcdef";
+        std::string result;
+        result.resize(size * 2); // Заранее выделяем память (быстрее, чем reserve + push_back)
 
         for (size_t i = 0; i < size; ++i)
         {
-            result += hexChars[(bytes[i] >> 4) & 0x0F];
-            result += hexChars[bytes[i] & 0x0F];
+            const uint8_t byte = bytes[i];
+            result[i * 2] = hexChars[byte >> 4];       // Старший полубайт
+            result[i * 2 + 1] = hexChars[byte & 0x0F]; // Младший полубайт
         }
 
         return result;
     }
 
+
     bool hexToBytes(const std::string& hex, uint8_t* bytes, const size_t size) noexcept
     {
-        if (hex.empty() || bytes == nullptr || size == 0 || hex.length() % 2 != 0)
+        if (hex.empty() || bytes == nullptr || size == 0 || hex.size() % 2 != 0)
         {
             return false;
         }
 
-        const size_t len = std::min(size, hex.length() / 2);
+        // Lookup-таблица для преобразования HEX-символов в полубайты (nibbles)
+        static constexpr uint8_t kHexLookup[256] = {
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,       // 0-15
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,       // 16-31
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,       // 32-47
+            0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 0, 0, 0, 0, 0,       // 48-63 ('0'-'9')
+            0, 10, 11, 12, 13, 14, 15, 0, 0, 0, 0, 0, 0, 0, 0, 0, // 64-79 ('A'-'F')
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,       // 80-95
+            0, 10, 11, 12, 13, 14, 15, 0, 0, 0, 0, 0, 0, 0, 0, 0, // 96-111 ('a'-'f')
+            // ... остальное заполнено нулями
+        };
+
+        const size_t len = std::min(size, hex.size() / 2);
 
         for (size_t i = 0, j = 0; j < len; i += 2, ++j)
         {
-            const uint8_t high = (hex[i] <= '9') ? (hex[i] - '0') : ((hex[i] & 0x0F) + 9);
-            const uint8_t low = (hex[i + 1] <= '9') ? (hex[i + 1] - '0') : ((hex[i + 1] & 0x0F) + 9);
-            bytes[j] = (high << 4) | low;
-        }
+            const char c1 = hex[i];
+            const char c2 = hex[i + 1];
 
-        return true;
-    }
-
-    bool compareBytes(const uint8_t* buf1, const uint8_t* buf2, const size_t size) noexcept
-    {
-        if (buf1 == nullptr || buf2 == nullptr)
-        {
-            return false;
-        }
-
-        for (size_t i = 0; i < size; ++i)
-        {
-            if (buf1[i] != buf2[i])
+            // Быстрая проверка на валидность HEX через lookup-таблицу
+            if ((kHexLookup[static_cast<uint8_t>(c1)] == 0 && c1 != '0') ||
+                (kHexLookup[static_cast<uint8_t>(c2)] == 0 && c2 != '0'))
             {
                 return false;
             }
-        }
-        return true;
-    }
 
-    uint16_t swapBytes(const uint16_t value) noexcept
-    {
-        return (value << 8) | (value >> 8);
+            bytes[j] = (kHexLookup[static_cast<uint8_t>(c1)] << 4) |
+                kHexLookup[static_cast<uint8_t>(c2)];
+        }
+
+        return true;
     }
 } // namespace esp32_c3::utils

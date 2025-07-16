@@ -4,9 +4,8 @@
 
 namespace esp32_c3::objects
 {
-    std::unique_ptr<TempSensor> TempSensor::create(const int rangeMin, const int rangeMax) noexcept
+    TempSensor::TempSensor(const int rangeMin, const int rangeMax) noexcept
     {
-        temperature_sensor_handle_t handle = nullptr;
         const temperature_sensor_config_t config = {
             .range_min = rangeMin,
             .range_max = rangeMax,
@@ -16,44 +15,57 @@ namespace esp32_c3::objects
             }
         };
 
-        esp_err_t ret = temperature_sensor_install(&config, &handle);
+        esp_err_t ret = temperature_sensor_install(&config, &mHandle);
         if (ret != ESP_OK)
         {
             ESP_LOGE(TAG, "Initialization failed: %s", esp_err_to_name(ret));
-            return nullptr;
+            return;
         }
 
-        ret = temperature_sensor_enable(handle);
+        ret = temperature_sensor_enable(mHandle);
         if (ret != ESP_OK)
         {
             ESP_LOGE(TAG, "Activation failed: %s", esp_err_to_name(ret));
-            temperature_sensor_uninstall(handle);
-            return nullptr;
+            temperature_sensor_uninstall(mHandle);
+            mHandle = nullptr;
+            return;
         }
 
         ESP_LOGI(TAG, "Sensor initialized (range: %d..%d°C)", rangeMin, rangeMax);
-        return std::unique_ptr<TempSensor>(new TempSensor(handle));
-    }
-
-    TempSensor::TempSensor(temperature_sensor_handle_t handle) noexcept
-        : mHandle(handle)
-    {
     }
 
     TempSensor::~TempSensor() noexcept
     {
-        if (mHandle)
+        if (!mHandle) return;
+
+        // Отключаем датчик
+        if (const esp_err_t err_disable = temperature_sensor_disable(mHandle);
+            err_disable != ESP_OK)
         {
-            ESP_ERROR_CHECK(temperature_sensor_disable(mHandle));
-            ESP_ERROR_CHECK(temperature_sensor_uninstall(mHandle));
-            ESP_LOGI(TAG, "Sensor deinitialized");
+            ESP_LOGE(TAG, "Failed to disable sensor: %s", esp_err_to_name(err_disable));
         }
+
+        // Удаляем драйвер
+        if (const esp_err_t err_uninstall = temperature_sensor_uninstall(mHandle);
+            err_uninstall != ESP_OK)
+        {
+            ESP_LOGE(TAG, "Failed to uninstall sensor: %s", esp_err_to_name(err_uninstall));
+        }
+
+        ESP_LOGI(TAG, "Sensor deinitialized");
+        mHandle = nullptr;
+    }
+
+    bool TempSensor::isInitialized() const noexcept
+    {
+        return mHandle != nullptr;
     }
 
     std::optional<float> TempSensor::read() const noexcept
     {
-        float temp = 0.0f;
+        if (!mHandle) return std::nullopt;
 
+        float temp = 0.0f;
         if (const esp_err_t ret = temperature_sensor_get_celsius(mHandle, &temp); ret != ESP_OK)
         {
             ESP_LOGE(TAG, "Read failed: %s", esp_err_to_name(ret));

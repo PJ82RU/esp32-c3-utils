@@ -33,37 +33,20 @@ namespace esp32_c3::objects
         using EventSendFunc = bool (*)(void* arg1, void* arg2);
 
         /**
-         * @brief Структура элемента callback
-         */
-        struct Item
-        {
-            bool onlyIndex;     ///< Флаг вызова только по индексу
-            EventSendFunc func; ///< Указатель на callback-функцию
-            void* params;       ///< Параметры для callback-функции
-        };
-
-        /**
-         * @brief Структура элемента буфера
-         */
-        struct BufferItem
-        {
-            int16_t itemIndex;   ///< Индекс callback-функции
-            uint8_t bufferIndex; ///< Индекс в буфере данных
-        };
-
-        /**
          * @brief Конструктор менеджера callback-функций
          * @param bufferSize Количество элементов в буфере
          * @param itemSize Размер одного элемента буфера (в байтах)
+         * @param numCallbacks Количество callback-функций
          * @param name Имя задачи для отладки
          * @param stackDepth Размер стека задачи (по умолчанию 3072)
          * @param priority Приоритет задачи (по умолчанию 18)
          */
         explicit Callback(uint8_t bufferSize,
-                                        size_t itemSize,
-                                        const char* name,
-                                        uint32_t stackDepth = DEFAULT_STACK_DEPTH,
-                                        UBaseType_t priority = DEFAULT_PRIORITY) noexcept;
+                          size_t itemSize,
+                          uint8_t numCallbacks,
+                          const char* name,
+                          uint32_t stackDepth = DEFAULT_STACK_DEPTH,
+                          UBaseType_t priority = DEFAULT_PRIORITY) noexcept;
 
         /// @brief Деструктор (освобождает ресурсы)
         ~Callback();
@@ -71,13 +54,6 @@ namespace esp32_c3::objects
         // Запрещаем копирование объектов
         Callback(const Callback&) = delete;
         Callback& operator=(const Callback&) = delete;
-
-        /**
-         * @brief Инициализация менеджера callback-функций
-         * @param numCallbacks Количество callback-функций
-         * @return true если инициализация прошла успешно
-         */
-        [[nodiscard]] bool init(uint8_t numCallbacks) noexcept;
 
         /**
          * @brief Проверка состояния инициализации
@@ -118,7 +94,26 @@ namespace esp32_c3::objects
         /// Родительский callback для обработки событий
         SimpleCallback parentCallback;
 
-    private:
+    protected:
+        /**
+         * @brief Структура элемента callback
+         */
+        struct Item
+        {
+            bool onlyIndex;     ///< Флаг вызова только по индексу
+            EventSendFunc func; ///< Указатель на callback-функцию
+            void* params;       ///< Параметры для callback-функции
+        };
+
+        /**
+         * @brief Структура элемента буфера
+         */
+        struct BufferItem
+        {
+            int16_t itemIndex;   ///< Индекс callback-функции
+            uint8_t bufferIndex; ///< Индекс в буфере данных
+        };
+
         /**
          * @brief Задача для обработки callback-функций
          * @param arg Указатель на объект Callback
@@ -143,7 +138,7 @@ namespace esp32_c3::objects
         Queue mQueue;
 
         /// Мьютекс для синхронизации
-        mutable std::mutex mMutex;
+        mutable std::recursive_mutex mMutex;
 
         /// Количество зарегистрированных callback-функций
         uint8_t mNumItems = 0;
@@ -159,6 +154,9 @@ namespace esp32_c3::objects
 
         /// Текущий индекс в буфере
         uint8_t mCurrentBufferIndex = 0;
+
+        /// Индекс для быстрого поиска свободного слота
+        mutable int16_t mLastFreeIndex = 0;
 
         /// Буфер для хранения данных
         uint8_t* mBuffer = nullptr;

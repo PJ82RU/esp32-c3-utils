@@ -23,16 +23,21 @@ namespace esp32_c3::objects
         static constexpr auto TAG = "TempSensor";
 
         /**
-         * @brief Создать экземпляр датчика температуры
+         * @brief Конструктор датчика температуры
          * @param rangeMin Минимальный диапазон измерения (°C)
          * @param rangeMax Максимальный диапазон измерения (°C)
-         * @return Указатель на экземпляр или nullptr при ошибке
          */
-        static std::unique_ptr<TempSensor> create(
+        explicit TempSensor(
             int rangeMin = -10,
             int rangeMax = 80) noexcept;
 
         ~TempSensor() noexcept;
+
+        /**
+         * @brief Проверить, успешно ли инициализирован датчик
+         * @return true если датчик готов к использованию
+         */
+        [[nodiscard]] bool isInitialized() const noexcept;
 
         /**
          * @brief Получить текущую температуру чипа
@@ -45,13 +50,7 @@ namespace esp32_c3::objects
         TempSensor& operator=(const TempSensor&) = delete;
 
     private:
-        /**
-         * @brief Приватный конструктор
-         * @param handle Хэндл датчика температуры
-         */
-        explicit TempSensor(temperature_sensor_handle_t handle) noexcept;
-
-        temperature_sensor_handle_t mHandle; ///< Хэндл драйвера датчика
+        temperature_sensor_handle_t mHandle = nullptr; ///< Хэндл драйвера датчика
     };
 } // namespace esp32_c3::objects
 

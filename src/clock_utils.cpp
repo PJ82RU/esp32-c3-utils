@@ -1,78 +1,60 @@
 #include "esp32_c3_utils/clock_utils.h"
-#include <cstdio>
 #include <cstring>
+#include <string>
 
 namespace esp32_c3::utils
 {
-    void formatTime(char* buffer, unsigned long time, const bool showDay,
-                    const bool showHour, const bool showMinute, const bool showSecond) noexcept
+    std::string formatTime(unsigned long timeMs,
+                           const bool showDay,
+                           const bool showHour,
+                           const bool showMinute,
+                           const bool showSecond,
+                           const char daySep,
+                           const char timeSep)
     {
-        if (buffer == nullptr)
-        {
-            return;
-        }
+        timeMs /= 1000; // секунды
+        const uint8_t seconds = timeMs % 60;
+        timeMs /= 60; // минуты
+        const uint8_t minutes = timeMs % 60;
+        timeMs /= 60; // часы
+        const uint8_t hours = timeMs % 24;
+        const uint16_t days = timeMs / 24;
 
-        // Конвертация времени из мс в компоненты
-        time /= 1000; // секунды
-        const uint8_t seconds = time % 60;
-        time /= 60; // минуты
-        const uint8_t minutes = time % 60;
-        time /= 60; // часы
-        const uint8_t hours = time % 24;
-        const uint8_t days = time / 24;
+        std::string result;
+        result.reserve(16); // Оптимизация: "DD.HH:MM:SS" = максимум 11 символов
 
-        char* ptr = buffer;
-        bool needSeparator = false;
-
-        // Форматирование дней
+        // Дни (если включены и > 0)
         if (showDay && days > 0)
         {
-            if (const int written = snprintf(ptr, 4, "%u", days); written > 0)
-            {
-                ptr += written;
-                needSeparator = showHour || showMinute || showSecond;
-                if (needSeparator)
-                {
-                    *ptr++ = '.';
-                }
-            }
+            if (days >= 100) result += '0' + (days / 100) % 10; // Поддержка >99 дней
+            if (days >= 10) result += '0' + (days / 10) % 10;
+            result += '0' + days % 10;
+            if (showHour || showMinute || showSecond) result += daySep;
         }
 
-        // Форматирование часов
+        // Часы (если включены)
         if (showHour)
         {
-            if (const int written = snprintf(ptr, 3, "%02u", hours); written > 0)
-            {
-                ptr += written;
-                needSeparator = showMinute || showSecond;
-                if (needSeparator)
-                {
-                    *ptr++ = ':';
-                }
-            }
+            result += '0' + hours / 10;
+            result += '0' + hours % 10;
+            if (showMinute || showSecond) result += timeSep;
         }
 
-        // Форматирование минут
+        // Минуты (если включены)
         if (showMinute)
         {
-            if (const int written = snprintf(ptr, 3, "%02u", minutes); written > 0)
-            {
-                ptr += written;
-                if (showSecond)
-                {
-                    *ptr++ = ':';
-                }
-            }
+            result += '0' + minutes / 10;
+            result += '0' + minutes % 10;
+            if (showSecond) result += timeSep;
         }
 
-        // Форматирование секунд
+        // Секунды (если включены)
         if (showSecond)
         {
-            snprintf(ptr, 3, "%02u", seconds);
-            ptr += 2;
+            result += '0' + seconds / 10;
+            result += '0' + seconds % 10;
         }
 
-        // Гарантированное завершение строки
-        *ptr = '\0';
+        return result;
     }
 } // namespace esp32_c3::utils
