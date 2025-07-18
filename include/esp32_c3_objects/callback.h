@@ -6,15 +6,28 @@
 #include "simple_callback.h"
 #include <mutex>
 #include <cstring>
+#include <memory>
 
 namespace esp32_c3::objects
 {
     /**
-     * @brief Класс для управления callback-функциями с буферизацией данных
+     * @brief Типизированный менеджер callback-функций
+     * @tparam T Тип передаваемых данных
+     * @tparam P Тип параметров callback-функций (по умолчанию void*)
      */
+    template <typename T, typename P = void*>
     class Callback
     {
+        static_assert(std::is_trivially_copyable_v<T>,
+                      "Type T must be trivially copyable");
+
     public:
+        /// @brief Количество callback-функций по умолчанию
+        static constexpr uint8_t DEFAULT_CALLBACKS = 10;
+
+        /// @brief Размер буфера данных по умолчанию
+        static constexpr uint8_t DEFAULT_BUFFER_SIZE = 5;
+
         /// @brief Размер стека задачи по умолчанию (в байтах)
         static constexpr uint32_t DEFAULT_STACK_DEPTH = 3072;
 
@@ -25,26 +38,30 @@ namespace esp32_c3::objects
         static constexpr auto TAG = "Callback";
 
         /**
-         * @brief Тип функции callback
-         * @param arg1 Указатель на данные
-         * @param arg2 Указатель на параметры
-         * @return Результат выполнения (true/false)
+         * @brief Тип callback-функции
+         * @param input Входные данные (read-only)
+         * @param output Буфер для результата (может быть nullptr)
+         * @param params Пользовательские параметры
+         * @return true если данные обработаны успешно
          */
-        using EventSendFunc = bool (*)(void* arg1, void* arg2);
+        using CallbackFunction = bool (*)(const T* input, T* output, P params) noexcept;
 
         /**
          * @brief Конструктор менеджера callback-функций
-         * @param bufferSize Количество элементов в буфере
-         * @param itemSize Размер одного элемента буфера (в байтах)
-         * @param numCallbacks Количество callback-функций
-         * @param name Имя задачи для отладки
-         * @param stackDepth Размер стека задачи (по умолчанию 3072)
-         * @param priority Приоритет задачи (по умолчанию 18)
+         * @param bufferSize Количество элементов в буфере (рекомендуется 3-10)
+         * @param numCallbacks Максимальное количество callback-функций (рекомендуется 5-15)
+         * @param name Имя задачи для отладки (должно быть статической строкой)
+         * @param stackDepth Размер стека задачи в байтах (по умолчанию 3072)
+         * @param priority Приоритет задачи FreeRTOS (по умолчанию 18)
+         *
+         * @note Особенности работы:
+         * - Выделяет память под буферы сразу в конструкторе
+         * - Автоматически запускает worker-поток
+         * - При ошибках выделения памяти объект остаётся неработоспособным (isInitialized() = false)
          */
-        explicit Callback(uint8_t bufferSize,
-                          size_t itemSize,
-                          uint8_t numCallbacks,
-                          const char* name,
+        explicit Callback(const char* name,
+                          uint8_t bufferSize = DEFAULT_BUFFER_SIZE,
+                          uint8_t numCallbacks = DEFAULT_CALLBACKS,
                           uint32_t stackDepth = DEFAULT_STACK_DEPTH,
                           UBaseType_t priority = DEFAULT_PRIORITY) noexcept;
 
@@ -68,8 +85,8 @@ namespace esp32_c3::objects
          * @param onlyIndex Флаг вызова только по индексу (опционально)
          * @return Индекс добавленной функции или -1 при ошибке
          */
-        [[nodiscard]] int16_t addCallback(EventSendFunc func,
-                                          void* params = nullptr,
+        [[nodiscard]] int16_t addCallback(CallbackFunction func,
+                                          P params = P{},
                                           bool onlyIndex = false) const noexcept;
 
         /**
@@ -78,21 +95,21 @@ namespace esp32_c3::objects
         void free() const noexcept;
 
         /**
-         * @brief Вызов callback-функции/функций
-         * @param value Указатель на данные для передачи
-         * @param index Индекс callback (-1 для вызова всех)
+         * @brief Вызывает callback-цепочку с обработкой данных
+         * @param input Входные данные (не изменяются)
+         * @param response Колбэк для отправки результата
+         * @param index Индекс callback (-1 для всех)
          */
-        void invoke(const void* value, int16_t index = -1) noexcept;
+        void invoke(const T* input,
+                    SimpleCallback<T>* response = nullptr,
+                    int16_t index = -1) noexcept;
 
         /**
          * @brief Чтение данных из буфера
          * @param value Указатель на буфер для данных
          * @return true если данные успешно прочитаны
          */
-        [[nodiscard]] bool read(void* value) const noexcept;
-
-        /// Родительский callback для обработки событий
-        SimpleCallback parentCallback;
+        [[nodiscard]] bool read(T* value) const noexcept;
 
     protected:
         /**
@@ -100,9 +117,9 @@ namespace esp32_c3::objects
          */
         struct Item
         {
-            bool onlyIndex;     ///< Флаг вызова только по индексу
-            EventSendFunc func; ///< Указатель на callback-функцию
-            void* params;       ///< Параметры для callback-функции
+            bool onlyIndex;        ///< Флаг вызова только по индексу
+            CallbackFunction func; ///< Указатель на callback-функцию
+            P params;              ///< Параметры для callback-функции
         };
 
         /**
@@ -110,8 +127,9 @@ namespace esp32_c3::objects
          */
         struct BufferItem
         {
-            int16_t itemIndex;   ///< Индекс callback-функции
-            uint8_t bufferIndex; ///< Индекс в буфере данных
+            int16_t itemIndex;           ///< Индекс callback-функции
+            uint8_t bufferIndex;         ///< Индекс в буфере данных
+            SimpleCallback<T>* response; ///< Указатель на колбэк ответа (может быть nullptr)
         };
 
         /**
@@ -124,7 +142,7 @@ namespace esp32_c3::objects
          * @brief Обработка элементов callback
          * @param item Элемент буфера для обработки
          */
-        void processItems(const BufferItem& item) const noexcept;
+        void process(const BufferItem& item) const noexcept;
 
         /**
          * @brief Основной цикл обработки
@@ -144,22 +162,19 @@ namespace esp32_c3::objects
         uint8_t mNumItems = 0;
 
         /// Массив callback-функций
-        Item* mItems = nullptr;
+        std::unique_ptr<Item[]> mItems = nullptr;
 
         /// Размер буфера данных
         uint8_t mBufferSize = 0;
 
-        /// Размер элемента данных
-        size_t mItemSize = 0;
+        /// Буфер для хранения данных
+        std::unique_ptr<T[]> mBuffer;
 
         /// Текущий индекс в буфере
         uint8_t mCurrentBufferIndex = 0;
 
         /// Индекс для быстрого поиска свободного слота
         mutable int16_t mLastFreeIndex = 0;
-
-        /// Буфер для хранения данных
-        uint8_t* mBuffer = nullptr;
     };
 } // namespace esp32_c3::objects
 

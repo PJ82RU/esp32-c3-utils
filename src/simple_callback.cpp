@@ -2,25 +2,29 @@
 
 namespace esp32_c3::objects
 {
-    SimpleCallback::SimpleCallback(const CallbackFunction callback, void* params) noexcept
+    template <typename T, typename P>
+    SimpleCallback<T, P>::SimpleCallback(const CallbackFunction callback, P params) noexcept
         : mCallback(callback),
           mParams(params)
     {
     }
 
-    void SimpleCallback::set(const CallbackFunction callback, void* params) noexcept
+    template <typename T, typename P>
+    void SimpleCallback<T, P>::set(CallbackFunction callback, P params) noexcept
     {
         mCallback = callback;
         mParams = params;
     }
 
-    void SimpleCallback::reset() noexcept
+    template <typename T, typename P>
+    void SimpleCallback<T, P>::reset() noexcept
     {
         mCallback = nullptr;
         mParams = nullptr;
     }
 
-    void SimpleCallback::invoke(void* value) const noexcept
+    template <typename T, typename P>
+    void SimpleCallback<T, P>::invoke(T* value) const noexcept
     {
         if (mCallback != nullptr)
         {
@@ -28,7 +32,8 @@ namespace esp32_c3::objects
         }
     }
 
-    bool SimpleCallback::isSet() const noexcept
+    template <typename T, typename P>
+    bool SimpleCallback<T, P>::isSet() const noexcept
     {
         return mCallback != nullptr;
     }

@@ -4,34 +4,34 @@
 namespace esp32_c3::objects
 {
     /**
-     * @brief Класс для работы с простыми callback-функциями C-стиля
-     *
-     * @details Предоставляет механизм для регистрации и вызова функций обратного вызова
-     *          с возможностью передачи пользовательских параметров
+     * @brief Типизированный класс для работы с callback-функциями
+     * @tparam T Тип передаваемых данных
+     * @tparam P Тип пользовательских параметров (по умолчанию void*)
      */
+    template <typename T, typename P = void*>
     class SimpleCallback
     {
     public:
         /**
          * @brief Тип функции обратного вызова
          * @param value Указатель на передаваемые данные
-         * @param params Указатель на пользовательские параметры
+         * @param params Пользовательские параметры
          */
-        using CallbackFunction = void (*)(void* value, void* params);
+        using CallbackFunction = void (*)(T* value, P params) noexcept;
 
         /**
-         * @brief Конструктор callback-объекта
+         * @brief Конструктор
          * @param callback Функция обратного вызова (может быть nullptr)
-         * @param params Пользовательские параметры для callback (может быть nullptr)
+         * @param params Пользовательские параметры
          */
-        explicit SimpleCallback(CallbackFunction callback = nullptr, void* params = nullptr) noexcept;
+        explicit SimpleCallback(CallbackFunction callback = nullptr, P params = P{}) noexcept;
 
         /**
-         * @brief Установка callback функции и параметров
-         * @param callback Функция обратного вызова (может быть nullptr)
-         * @param params Пользовательские параметры (может быть nullptr)
+         * @brief Установка callback
+         * @param callback Функция обратного вызова
+         * @param params Пользовательские параметры
          */
-        void set(CallbackFunction callback, void* params) noexcept;
+        void set(CallbackFunction callback, P params) noexcept;
 
         /**
          * @brief Сброс зарегистрированного callback
@@ -44,7 +44,7 @@ namespace esp32_c3::objects
          * @param value Указатель на данные для передачи в callback
          * @note Ничего не происходит если callback не установлен
          */
-        void invoke(void* value) const noexcept;
+        void invoke(T* value) const noexcept;
 
         /**
          * @brief Проверка наличия зарегистрированного callback
@@ -57,7 +57,7 @@ namespace esp32_c3::objects
         CallbackFunction mCallback = nullptr;
 
         /// Пользовательские параметры для callback
-        void* mParams = nullptr;
+        P mParams = nullptr;
     };
 } // namespace esp32_c3::utils
 
