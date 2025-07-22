@@ -2,11 +2,13 @@
 #define ESP32_C3_UTILS_CALLBACK_H
 
 #include "thread.h"
-#include "queue.h"
+#include "buffered_queue.h"
 #include "simple_callback.h"
+
 #include <mutex>
 #include <cstring>
 #include <memory>
+
 
 namespace esp32_c3::objects
 {
@@ -123,13 +125,12 @@ namespace esp32_c3::objects
         };
 
         /**
-         * @brief Структура элемента буфера
+         * @brief Структура элемента задачи
          */
-        struct BufferItem
-        {
-            int16_t itemIndex;           ///< Индекс callback-функции
-            uint8_t bufferIndex;         ///< Индекс в буфере данных
-            SimpleCallback<T>* response; ///< Указатель на колбэк ответа (может быть nullptr)
+        struct TaskItem {
+            int16_t itemIndex;
+            T data;
+            SimpleCallback<T>* response;
         };
 
         /**
@@ -140,9 +141,9 @@ namespace esp32_c3::objects
 
         /**
          * @brief Обработка элементов callback
-         * @param item Элемент буфера для обработки
+         * @param item Элемент задачи для обработки
          */
-        void process(const BufferItem& item) const noexcept;
+        void process(const TaskItem& item) const noexcept;
 
         /**
          * @brief Основной цикл обработки
@@ -153,25 +154,16 @@ namespace esp32_c3::objects
         Thread mThread;
 
         /// Очередь для хранения заданий
-        Queue mQueue;
+        BufferedQueue<TaskItem, DEFAULT_BUFFER_SIZE> mQueue;
 
         /// Мьютекс для синхронизации
         mutable std::recursive_mutex mMutex;
 
-        /// Количество зарегистрированных callback-функций
-        uint8_t mNumItems = 0;
-
         /// Массив callback-функций
         std::unique_ptr<Item[]> mItems = nullptr;
 
-        /// Размер буфера данных
-        uint8_t mBufferSize = 0;
-
-        /// Буфер для хранения данных
-        std::unique_ptr<T[]> mBuffer;
-
-        /// Текущий индекс в буфере
-        uint8_t mCurrentBufferIndex = 0;
+        /// Количество зарегистрированных callback-функций
+        uint8_t mNumItems = 0;
 
         /// Индекс для быстрого поиска свободного слота
         mutable int16_t mLastFreeIndex = 0;

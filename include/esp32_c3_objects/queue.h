@@ -3,100 +3,77 @@
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
-#include <esp_log.h>
 
 namespace esp32_c3::objects
 {
     /**
-     * @brief Класс-обертка для работы с очередью FreeRTOS
-     *
-     * @details Предоставляет безопасный интерфейс для работы с очередями FreeRTOS
-     *          с поддержкой RAII и семантики перемещения. Гарантирует освобождение
-     *          ресурсов при уничтожении объекта.
+     * @brief Типобезопасная обертка для очереди FreeRTOS
+     * @tparam T Тип элементов очереди (должен быть тривиально копируемым)
      */
+    template <typename T>
     class Queue
     {
     public:
-        static constexpr auto TAG = "Queue"; ///< Тег для логирования
+        /// @brief Тег для логирования
+        static constexpr auto TAG = "Queue";
 
         /**
-         * @brief Конструктор очереди FreeRTOS
-         * @param queueLength Максимальное количество элементов в очереди
-         * @param itemSize Размер каждого элемента в байтах
-         * @throws std::runtime_error Если создание очереди не удалось
+         * @brief Конструктор очереди
+         * @param queueLength Максимальное количество элементов
          */
-        Queue(UBaseType_t queueLength, UBaseType_t itemSize);
+        explicit Queue(UBaseType_t queueLength) noexcept;
 
-        /// @brief Деструктор - автоматически удаляет очередь FreeRTOS
         ~Queue() noexcept;
 
         // Запрет копирования
         Queue(const Queue&) = delete;
         Queue& operator=(const Queue&) = delete;
 
-        /**
-         * @brief Конструктор перемещения
-         * @param other Объект для перемещения
-         */
+        // Поддержка перемещения
         Queue(Queue&& other) noexcept;
-
-        /**
-         * @brief Оператор перемещения
-         * @param other Объект для перемещения
-         * @return Ссылка на текущий объект
-         */
         Queue& operator=(Queue&& other) noexcept;
 
         /**
-         * @brief Получить количество элементов в очереди
-         * @return Количество элементов, ожидающих обработки
+         * @brief Проверка валидности очереди
+         * @return true если очередь создана успешно
          */
-        [[nodiscard]] UBaseType_t messagesWaiting() const noexcept;
-
-        /**
-         * @brief Получить количество свободных мест в очереди
-         * @return Количество доступных слотов для новых элементов
-         */
-        [[nodiscard]] UBaseType_t spacesAvailable() const noexcept;
+        [[nodiscard]] bool isValid() const noexcept;
 
         /**
          * @brief Отправить элемент в очередь
-         * @param item Указатель на отправляемые данные
-         * @param ticksToWait Время ожидания в тиках (0 - не ждать)
-         * @return true если отправка успешна, false при ошибке или таймауте
+         * @param item Элемент для отправки
+         * @param ticksToWait Время ожидания
+         * @return true если успешно
          */
-        [[nodiscard]] bool send(const void* item, TickType_t ticksToWait = 0) const noexcept;
+        bool send(const T& item, TickType_t ticksToWait = 0) const noexcept;
 
         /**
-         * @brief Перезаписать элемент в очереди (для очередей длиной 1)
-         * @param item Указатель на новые данные
-         * @return true если операция успешна
-         * @note Используется только для очередей размером 1
+         * @brief Перезаписать элемент (для очередей длиной 1)
+         * @param item Новый элемент
+         * @return true если успешно
          */
-        [[nodiscard]] bool overwrite(const void* item) const noexcept;
+        bool overwrite(const T& item) const noexcept;
 
         /**
          * @brief Получить элемент из очереди
-         * @param buffer Буфер для принятых данных
-         * @param ticksToWait Время ожидания в тиках (portMAX_DELAY - ждать вечно)
-         * @return true если получение успешно, false при ошибке или таймауте
+         * @param item Ссылка для сохранения элемента
+         * @param ticksToWait Время ожидания
+         * @return true если успешно
          */
-        [[nodiscard]] bool receive(void* buffer, TickType_t ticksToWait = portMAX_DELAY) const noexcept;
+        bool receive(T& item, TickType_t ticksToWait = portMAX_DELAY) const noexcept;
 
-        /**
-         * @brief Очистить очередь
-         * @note Удаляет все элементы из очереди
-         */
-        void reset() const noexcept;
+        /// @brief Количество элементов в очереди
+        [[nodiscard]] UBaseType_t messagesWaiting() const noexcept;
+
+        /// @brief Количество свободных мест
+        [[nodiscard]] UBaseType_t spacesAvailable() const noexcept;
+
+        /// @brief Очистить очередь
+        bool reset() const noexcept;
 
     private:
-        /**
-         * @brief Внутренняя функция для освобождения ресурсов
-         * @note Вызывается при уничтожении или перемещении объекта
-         */
         void cleanup() noexcept;
-
-        QueueHandle_t mHandle = nullptr; ///< Хэндл очереди FreeRTOS
+        QueueHandle_t mHandle = nullptr;
     };
 } // namespace esp32_c3::objects
 

@@ -11,13 +11,11 @@ namespace esp32_c3::objects
                              const uint32_t stackDepth,
                              const UBaseType_t priority) noexcept :
         mThread(name, stackDepth, priority),
-        mQueue(bufferSize, sizeof(BufferItem)),
-        mNumItems(numCallbacks),
+        mQueue(bufferSize),
         mItems(numCallbacks > 0 ? std::make_unique<Item[]>(numCallbacks) : nullptr),
-        mBufferSize(bufferSize),
-        mBuffer(bufferSize > 0 ? std::make_unique<T[]>(bufferSize) : nullptr)
+        mNumItems(numCallbacks)
     {
-        if (mBuffer && mItems)
+        if (mQueue.isValid() && mItems)
         {
             ESP_LOGI(TAG, "Constructed with buffer size %d and %d callbacks",
                      bufferSize, numCallbacks);
@@ -45,7 +43,7 @@ namespace esp32_c3::objects
     bool Callback<T, P>::isInitialized() const noexcept
     {
         std::lock_guard lock(mMutex);
-        return mBuffer && mItems && mThread.isRunning();
+        return mQueue.isValid() && mItems && mThread.isRunning();
     }
 
     template <typename T, typename P>
@@ -90,27 +88,14 @@ namespace esp32_c3::objects
     template <typename T, typename P>
     void Callback<T, P>::invoke(const T* input, SimpleCallback<T>* response, const int16_t index) noexcept
     {
-        if (!isInitialized() || !input)
+        if (!input || !isInitialized())
         {
             ESP_LOGE(TAG, "Invoke failed: not initialized or null input");
             return;
         }
 
-        std::lock_guard lock(mMutex);
-
-        // Копируем входные данные в буфер
-        const uint8_t bufferIndex = mCurrentBufferIndex;
-        mBuffer[bufferIndex] = *input;
-        mCurrentBufferIndex = (bufferIndex + 1) % mBufferSize;
-
-        // Формируем задание для обработки
-        const BufferItem item{
-            .itemIndex = index,
-            .bufferIndex = bufferIndex,
-            .response = response
-        };
-
-        if (mQueue.send(&item) != pdTRUE)
+        TaskItem item{index, *input, response};
+        if (!mQueue.send(&item))
         {
             ESP_LOGE(TAG, "Failed to send item to queue");
         }
@@ -119,52 +104,44 @@ namespace esp32_c3::objects
     template <typename T, typename P>
     bool Callback<T, P>::read(T* value) const noexcept
     {
-        if (!isInitialized() || !value) return false;
-
-        BufferItem item{};
-        const bool result = mQueue.receive(&item, 0);
-        if (result)
+        if (value && isInitialized())
         {
-            std::lock_guard lock(mMutex);
-            *value = mBuffer[item.bufferIndex];
+            if (TaskItem item; mQueue.receive(item))
+            {
+                *value = item.data;
+                return true;
+            }
         }
-
-        return result;
+        return false;
     }
 
     template <typename T, typename P>
     void Callback<T, P>::callbackTask(void* arg) noexcept
     {
-        if (const auto* cb = static_cast<Callback*>(arg))
-        {
-            cb->run();
-        }
+        static_cast<Callback*>(arg)->run();
         vTaskDelete(nullptr);
     }
 
     // ReSharper disable CppDFAUnusedValue
     template <typename T, typename P>
-    void Callback<T, P>::process(const BufferItem& item) const noexcept
+    void Callback<T, P>::process(const TaskItem& item) const noexcept
     {
-        const T* input = &mBuffer[item.bufferIndex];
         std::lock_guard lock(mMutex);
-
         for (uint8_t i = 0; i < mNumItems; ++i)
         {
-            if (const auto& [onlyIndex, func, params] = mItems[i]; func && (!onlyIndex || item.itemIndex == i))
+            if (const auto& cb = mItems[i]; cb.func && (!cb.onlyIndex || item.itemIndex == i))
             {
                 if (item.response)
                 {
-                    // Выделяем временный буфер
                     T output;
-                    if (func(input, &output, params))
+                    if (cb.func(&item.data, &output, cb.params))
                     {
                         item.response->invoke(&output);
                     }
                 }
                 else
                 {
-                    (void)func(input, nullptr, params);
+                    cb.func(&item.data, nullptr, cb.params);
                 }
             }
         }
@@ -173,10 +150,10 @@ namespace esp32_c3::objects
     template <typename T, typename P>
     void Callback<T, P>::run() const noexcept
     {
-        BufferItem item{};
-        while (mQueue.receive(&item, portMAX_DELAY))
+        TaskItem item;
+        while (mQueue.receive(item))
         {
-            processItems(item);
+            process(item);
         }
     }
 } // namespace esp32_c3::objects

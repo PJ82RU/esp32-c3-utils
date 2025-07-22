@@ -2,33 +2,42 @@
 
 #include <stdexcept>
 #include <utility>
+#include <esp_log.h>
 
 namespace esp32_c3::objects
 {
-    Queue::Queue(const UBaseType_t queueLength, const UBaseType_t itemSize)
+    template <typename T>
+    Queue<T>::Queue(const UBaseType_t queueLength) noexcept
     {
-        mHandle = xQueueCreate(queueLength, itemSize);
+        static_assert(std::is_trivially_copyable_v<T>,
+                      "Queue elements must be trivially copyable");
+
+        mHandle = xQueueCreate(queueLength, sizeof(T));
         if (mHandle == nullptr)
         {
-            ESP_LOGE(TAG, "Failed to create queue (length=%u, itemSize=%u)", queueLength, itemSize);
+            ESP_LOGE(TAG, "Queue creation failed (length=%u, size=%zu)",
+                     queueLength, sizeof(T));
         }
         else
         {
-            ESP_LOGD(TAG, "Queue created (length=%u, itemSize=%u)", queueLength, itemSize);
+            ESP_LOGD(TAG, "Queue created (length=%u)", queueLength);
         }
     }
 
-    Queue::~Queue() noexcept
+    template <typename T>
+    Queue<T>::~Queue() noexcept
     {
         cleanup();
     }
 
-    Queue::Queue(Queue&& other) noexcept
+    template <typename T>
+    Queue<T>::Queue(Queue&& other) noexcept
         : mHandle(std::exchange(other.mHandle, nullptr))
     {
     }
 
-    Queue& Queue::operator=(Queue&& other) noexcept
+    template <typename T>
+    Queue<T>& Queue<T>::operator=(Queue&& other) noexcept
     {
         if (this != &other)
         {
@@ -38,9 +47,16 @@ namespace esp32_c3::objects
         return *this;
     }
 
-    void Queue::cleanup() noexcept
+    template <typename T>
+    bool Queue<T>::isValid() const noexcept
     {
-        if (mHandle != nullptr)
+        return mHandle != nullptr;
+    }
+
+    template <typename T>
+    void Queue<T>::cleanup() noexcept
+    {
+        if (mHandle)
         {
             vQueueDelete(mHandle);
             mHandle = nullptr;
@@ -48,37 +64,41 @@ namespace esp32_c3::objects
         }
     }
 
-    UBaseType_t Queue::messagesWaiting() const noexcept
+    template <typename T>
+    bool Queue<T>::send(const T& item, const TickType_t ticksToWait) const noexcept
     {
-        return mHandle != nullptr ? uxQueueMessagesWaiting(mHandle) : 0;
+        return mHandle && xQueueSend(mHandle, &item, ticksToWait) == pdTRUE;
     }
 
-    UBaseType_t Queue::spacesAvailable() const noexcept
+    template <typename T>
+    bool Queue<T>::overwrite(const T& item) const noexcept
     {
-        return mHandle != nullptr ? uxQueueSpacesAvailable(mHandle) : 0;
+        return mHandle && xQueueOverwrite(mHandle, &item) == pdTRUE;
     }
 
-    bool Queue::send(const void* item, const TickType_t ticksToWait) const noexcept
+    template <typename T>
+    bool Queue<T>::receive(T& item, const TickType_t ticksToWait) const noexcept
     {
-        return mHandle != nullptr && (xQueueSend(mHandle, item, ticksToWait) == pdTRUE);
+        return mHandle && xQueueReceive(mHandle, &item, ticksToWait) == pdTRUE;
     }
 
-    bool Queue::overwrite(const void* item) const noexcept
+    template <typename T>
+    UBaseType_t Queue<T>::messagesWaiting() const noexcept
     {
-        return mHandle != nullptr && (xQueueOverwrite(mHandle, item) == pdTRUE);
+        return mHandle ? uxQueueMessagesWaiting(mHandle) : 0;
     }
 
-    bool Queue::receive(void* buffer, const TickType_t ticksToWait) const noexcept
+    template <typename T>
+    UBaseType_t Queue<T>::spacesAvailable() const noexcept
     {
-        return mHandle != nullptr && (xQueueReceive(mHandle, buffer, ticksToWait) == pdTRUE);
+        return mHandle ? uxQueueSpacesAvailable(mHandle) : 0;
     }
 
-    void Queue::reset() const noexcept
+    template <typename T>
+    bool Queue<T>::reset() const noexcept
     {
-        if (mHandle != nullptr)
-        {
-            xQueueReset(mHandle);
-            ESP_LOGD(TAG, "Queue reset");
-        }
+        if (!mHandle) return false;
+        xQueueReset(mHandle);
+        return true;
     }
 } // namespace esp32_c3::objects
