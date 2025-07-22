@@ -265,7 +265,7 @@ namespace esp32_c3::objects
         /**
          * @brief Основной цикл обработки
          */
-        void run() const noexcept
+        void run() noexcept
         {
             TaskItem item;
             while (mQueue.receive(item))
