@@ -60,7 +60,7 @@ namespace esp32_c3::objects
          * @param ticksToWait Время ожидания
          * @return true если успешно
          */
-        bool receive(T& item, TickType_t ticksToWait = portMAX_DELAY) const noexcept;
+        [[nodiscard]] bool receive(T& item, TickType_t ticksToWait = portMAX_DELAY) const noexcept;
 
         /// @brief Количество элементов в очереди
         [[nodiscard]] UBaseType_t messagesWaiting() const noexcept;

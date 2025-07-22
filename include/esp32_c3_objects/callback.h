@@ -87,9 +87,9 @@ namespace esp32_c3::objects
          * @param onlyIndex Флаг вызова только по индексу (опционально)
          * @return Индекс добавленной функции или -1 при ошибке
          */
-        [[nodiscard]] int16_t addCallback(CallbackFunction func,
-                                          P params = P{},
-                                          bool onlyIndex = false) const noexcept;
+        int16_t addCallback(CallbackFunction func,
+                            P params = P{},
+                            bool onlyIndex = false) const noexcept;
 
         /**
          * @brief Очистка всех зарегистрированных callback-функций
@@ -127,7 +127,8 @@ namespace esp32_c3::objects
         /**
          * @brief Структура элемента задачи
          */
-        struct TaskItem {
+        struct TaskItem
+        {
             int16_t itemIndex;
             T data;
             SimpleCallback<T>* response;
