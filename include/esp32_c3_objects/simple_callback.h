@@ -29,33 +29,54 @@ namespace esp32_c3::objects
          * @param callback Функция обратного вызова (может быть nullptr)
          * @param params Пользовательские параметры
          */
-        explicit SimpleCallback(CallbackFunction callback = nullptr, P params = P{}) noexcept;
+        explicit SimpleCallback(const CallbackFunction callback = nullptr, P params = P{}) noexcept
+            : mCallback(callback),
+              mParams(params)
+        {
+        }
 
         /**
          * @brief Установка callback
          * @param callback Функция обратного вызова
          * @param params Пользовательские параметры
          */
-        void set(CallbackFunction callback, P params) noexcept;
+        void set(CallbackFunction callback, P params) noexcept
+        {
+            mCallback = callback;
+            mParams = params;
+        }
 
         /**
          * @brief Сброс зарегистрированного callback
          * @note После вызова isSet() будет возвращать false
          */
-        void reset() noexcept;
+        void reset() noexcept
+        {
+            mCallback = nullptr;
+            mParams = P{};
+        }
 
         /**
          * @brief Вызов зарегистрированного callback
          * @param value Указатель на данные для передачи в callback
          * @note Ничего не происходит если callback не установлен
          */
-        void invoke(const T& value) const noexcept;
+        void invoke(const T& value) const noexcept
+        {
+            if (mCallback != nullptr)
+            {
+                mCallback(value, mParams);
+            }
+        }
 
         /**
          * @brief Проверка наличия зарегистрированного callback
          * @return true если callback был установлен и не был сброшен
          */
-        [[nodiscard]] bool isSet() const noexcept;
+        [[nodiscard]] bool isSet() const noexcept
+        {
+            return mCallback != nullptr;
+        }
 
     private:
         /// Указатель на функцию обратного вызова
@@ -64,6 +85,6 @@ namespace esp32_c3::objects
         /// Пользовательские параметры для callback
         P mParams = nullptr;
     };
-} // namespace esp32_c3::utils
+} // namespace esp32_c3::objects
 
 #endif // ESP32_C3_UTILS_SIMPLE_CALLBACK_H

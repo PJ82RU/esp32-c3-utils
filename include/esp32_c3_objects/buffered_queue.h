@@ -5,6 +5,7 @@
 
 #include "queue.h"
 #include <memory>
+#include "esp_log.h"
 
 namespace esp32_c3::objects
 {
@@ -24,13 +25,39 @@ namespace esp32_c3::objects
          * @brief Конструктор
          * @param queueLength Максимальное количество элементов в очереди
          */
-        explicit BufferedQueue(UBaseType_t queueLength) noexcept;
+        explicit BufferedQueue(UBaseType_t queueLength) noexcept
+            : mQueue(queueLength),
+              mFreeIndices(BufferSize),
+              mBuffer(std::make_unique<T[]>(BufferSize))
+        {
+            // Проверка успешности создания всех компонентов
+            mInitialized = mQueue.isValid() && mFreeIndices.isValid() && mBuffer;
+
+            if (mInitialized)
+            {
+                // Инициализация свободных индексов
+                for (size_t i = 0; i < BufferSize; ++i)
+                {
+                    if (!mFreeIndices.send(i, 0))
+                    {
+                        mInitialized = false;
+                        break;
+                    }
+                }
+            }
+
+            ESP_LOGD(TAG, "BufferedQueue %s initialized (buffer size: %zu)",
+                     mInitialized ? "successfully" : "failed to", BufferSize);
+        }
 
         /**
          * @brief Проверка валидности очереди
          * @return true если все компоненты инициализированы успешно
          */
-        [[nodiscard]] bool isValid() const noexcept;
+        [[nodiscard]] bool isValid() const noexcept
+        {
+            return mInitialized;
+        }
 
         /**
          * @brief Отправить элемент в очередь
@@ -38,7 +65,30 @@ namespace esp32_c3::objects
          * @param ticksToWait Время ожидания
          * @return true если успешно
          */
-        bool send(const T& item, TickType_t ticksToWait = portMAX_DELAY) noexcept;
+        bool send(const T& item, TickType_t ticksToWait = portMAX_DELAY) noexcept
+        {
+            if (!mInitialized) return false;
+
+            size_t index;
+            if (!getFreeIndex(index, ticksToWait))
+            {
+                ESP_LOGW(TAG, "Failed to get free index");
+                return false;
+            }
+
+            // Копируем данные в буфер
+            mBuffer[index] = item;
+
+            // Отправляем индекс в очередь
+            if (QueueItem qi{index}; !mQueue.send(qi, ticksToWait))
+            {
+                ESP_LOGE(TAG, "Failed to send item to queue");
+                returnFreeIndex(index);
+                return false;
+            }
+
+            return true;
+        }
 
         /**
          * @brief Получить элемент из очереди
@@ -46,13 +96,36 @@ namespace esp32_c3::objects
          * @param ticksToWait Время ожидания
          * @return true если успешно
          */
-        bool receive(T& item, TickType_t ticksToWait = portMAX_DELAY) noexcept;
+        bool receive(T& item, TickType_t ticksToWait = portMAX_DELAY) noexcept
+        {
+            if (!mInitialized) return false;
+
+            QueueItem qi;
+            if (!mQueue.receive(qi, ticksToWait))
+            {
+                ESP_LOGW(TAG, "Failed to receive from queue");
+                return false;
+            }
+
+            // Копируем данные из буфера
+            item = mBuffer[qi.index];
+
+            // Возвращаем индекс в пул
+            returnFreeIndex(qi.index);
+            return true;
+        }
 
         /// @brief Количество свободных мест в очереди
-        [[nodiscard]] size_t available() const noexcept;
+        [[nodiscard]] size_t available() const noexcept
+        {
+            return mInitialized ? mQueue.spacesAvailable() : 0;
+        }
 
         /// @brief Количество ожидающих элементов
-        [[nodiscard]] size_t waiting() const noexcept;
+        [[nodiscard]] size_t waiting() const noexcept
+        {
+            return mInitialized ? mQueue.messagesWaiting() : 0;
+        }
 
     private:
         struct QueueItem
@@ -60,8 +133,18 @@ namespace esp32_c3::objects
             size_t index; ///< Индекс элемента в буфере
         };
 
-        bool getFreeIndex(size_t& index, TickType_t ticksToWait) const noexcept;
-        void returnFreeIndex(size_t index) const noexcept;
+        bool getFreeIndex(size_t& index, TickType_t ticksToWait) const noexcept
+        {
+            return mInitialized && mFreeIndices.receive(index, ticksToWait);
+        }
+
+        void returnFreeIndex(size_t index) const noexcept
+        {
+            if (mInitialized)
+            {
+                (void)mFreeIndices.send(index, 0);
+            }
+        }
 
         Queue<QueueItem> mQueue;      ///< Основная очередь
         Queue<size_t> mFreeIndices;   ///< Очередь свободных индексов
