@@ -86,15 +86,15 @@ namespace esp32_c3::objects
     }
 
     template <typename T, typename P>
-    void Callback<T, P>::invoke(const T* input, SimpleCallback<T>* response, const int16_t index) noexcept
+    void Callback<T, P>::invoke(const T& input, SimpleCallback<T>* response, const int16_t index) noexcept
     {
-        if (!input || !isInitialized())
+        if (!isInitialized())
         {
             ESP_LOGE(TAG, "Invoke failed: not initialized or null input");
             return;
         }
 
-        TaskItem item{index, *input, response};
+        TaskItem item{index, std::move(input), response};
         if (!mQueue.send(&item))
         {
             ESP_LOGE(TAG, "Failed to send item to queue");
@@ -102,13 +102,13 @@ namespace esp32_c3::objects
     }
 
     template <typename T, typename P>
-    bool Callback<T, P>::read(T* value) const noexcept
+    bool Callback<T, P>::read(T& value) const noexcept
     {
-        if (value && isInitialized())
+        if (isInitialized())
         {
             if (TaskItem item; mQueue.receive(item))
             {
-                *value = item.data;
+                value = item.data;
                 return true;
             }
         }
@@ -126,23 +126,26 @@ namespace esp32_c3::objects
     template <typename T, typename P>
     void Callback<T, P>::process(const TaskItem& item) const noexcept
     {
-        std::lock_guard lock(mMutex);
-        for (uint8_t i = 0; i < mNumItems; ++i)
+        // 1. Быстро копируем нужные callback'и под блокировкой
+        std::vector<Item, P> activeCallbacks;
         {
-            if (const auto& cb = mItems[i]; cb.func && (!cb.onlyIndex || item.itemIndex == i))
+            std::lock_guard lock(mMutex);
+            activeCallbacks.reserve(mNumItems);
+            for (const auto& cb : mItems)
             {
-                if (item.response)
+                if (cb.func && (!cb.onlyIndex || cb.onlyIndex == item.itemIndex))
                 {
-                    T output;
-                    if (cb.func(&item.data, &output, cb.params))
-                    {
-                        item.response->invoke(&output);
-                    }
+                    activeCallbacks.push_back(cb);
                 }
-                else
-                {
-                    cb.func(&item.data, nullptr, cb.params);
-                }
+            }
+        }
+
+        // 2. Обрабатываем без блокировки
+        for (const auto& cb : activeCallbacks)
+        {
+            if (T output; cb.func(item.data, output, cb.params))
+            {
+                if (item.response) item.response->invoke(output);
             }
         }
     }

@@ -9,7 +9,6 @@
 #include <cstring>
 #include <memory>
 
-
 namespace esp32_c3::objects
 {
     /**
@@ -46,7 +45,7 @@ namespace esp32_c3::objects
          * @param params Пользовательские параметры
          * @return true если данные обработаны успешно
          */
-        using CallbackFunction = bool (*)(const T* input, T* output, P params) noexcept;
+        using CallbackFunction = bool (*)(const T& input, T& output, P params) noexcept;
 
         /**
          * @brief Конструктор менеджера callback-функций
@@ -102,7 +101,7 @@ namespace esp32_c3::objects
          * @param response Колбэк для отправки результата
          * @param index Индекс callback (-1 для всех)
          */
-        void invoke(const T* input,
+        void invoke(const T& input,
                     SimpleCallback<T>* response = nullptr,
                     int16_t index = -1) noexcept;
 
@@ -111,7 +110,7 @@ namespace esp32_c3::objects
          * @param value Указатель на буфер для данных
          * @return true если данные успешно прочитаны
          */
-        [[nodiscard]] bool read(T* value) const noexcept;
+        [[nodiscard]] bool read(T& value) const noexcept;
 
     protected:
         /**
@@ -158,7 +157,7 @@ namespace esp32_c3::objects
         BufferedQueue<TaskItem, DEFAULT_BUFFER_SIZE> mQueue;
 
         /// Мьютекс для синхронизации
-        mutable std::recursive_mutex mMutex;
+        mutable std::mutex mMutex;
 
         /// Массив callback-функций
         std::unique_ptr<Item[]> mItems = nullptr;

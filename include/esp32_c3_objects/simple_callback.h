@@ -1,6 +1,8 @@
 #ifndef ESP32_C3_UTILS_SIMPLE_CALLBACK_H
 #define ESP32_C3_UTILS_SIMPLE_CALLBACK_H
 
+#include <type_traits>
+
 namespace esp32_c3::objects
 {
     /**
@@ -11,13 +13,16 @@ namespace esp32_c3::objects
     template <typename T, typename P = void*>
     class SimpleCallback
     {
+        static_assert(std::is_trivially_copyable_v<T>,
+                      "Type T must be trivially copyable");
+
     public:
         /**
          * @brief Тип функции обратного вызова
          * @param value Указатель на передаваемые данные
          * @param params Пользовательские параметры
          */
-        using CallbackFunction = void (*)(T* value, P params) noexcept;
+        using CallbackFunction = void (*)(const T& value, P params) noexcept;
 
         /**
          * @brief Конструктор
@@ -44,7 +49,7 @@ namespace esp32_c3::objects
          * @param value Указатель на данные для передачи в callback
          * @note Ничего не происходит если callback не установлен
          */
-        void invoke(T* value) const noexcept;
+        void invoke(const T& value) const noexcept;
 
         /**
          * @brief Проверка наличия зарегистрированного callback

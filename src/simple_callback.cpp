@@ -20,11 +20,11 @@ namespace esp32_c3::objects
     void SimpleCallback<T, P>::reset() noexcept
     {
         mCallback = nullptr;
-        mParams = nullptr;
+        mParams = P{};
     }
 
     template <typename T, typename P>
-    void SimpleCallback<T, P>::invoke(T* value) const noexcept
+    void SimpleCallback<T, P>::invoke(const T& value) const noexcept
     {
         if (mCallback != nullptr)
         {
