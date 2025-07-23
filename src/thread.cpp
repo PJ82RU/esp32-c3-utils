@@ -103,6 +103,17 @@ namespace esp32_c3::objects
         return ESP_ERR_NO_MEM;
     }
 
+    bool Thread::quickStart(const LoopFunc& loopFunc)
+    {
+        if (state() != State::NOT_RUNNING) return true;
+        if (start(loopFunc) != ESP_OK)
+        {
+            ESP_LOGE(TAG, "Failed to start callback thread");
+            return false;
+        }
+        return true;
+    }
+
     // ReSharper disable CppDFAConstantConditions
     void Thread::stop(const bool softStop) noexcept
     {

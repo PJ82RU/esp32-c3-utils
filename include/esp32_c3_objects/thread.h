@@ -94,6 +94,13 @@ namespace esp32_c3::objects
         [[nodiscard]] esp_err_t start(TaskFunction_t taskFunc, void* params, BaseType_t coreId) noexcept;
 
         /**
+         * @brief Запуск/проверка рабочего потока
+         * @param loopFunc Функция цикла выполнения
+         * @return true если поток успешно запущен или уже работает
+         */
+        bool quickStart(const LoopFunc& loopFunc);
+
+        /**
          * @brief Остановка и удаление задачи
          * @param softStop Флаг мягкой остановки (true - ожидание завершения, false - принудительная)
          * @note Безопасно вызывать даже если задача не запущена

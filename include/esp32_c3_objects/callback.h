@@ -265,8 +265,6 @@ namespace esp32_c3::objects
          */
         bool run()
         {
-            if (mThread.state() != Thread::State::NOT_RUNNING) return true;
-
             auto loop = [&]()
             {
                 if (TaskItem item; mQueue.receive(item))
@@ -275,13 +273,7 @@ namespace esp32_c3::objects
                 }
                 return Thread::LoopAction::CONTINUE;
             };
-
-            if (mThread.start(loop) != ESP_OK)
-            {
-                ESP_LOGE(TAG, "Failed to start callback thread");
-                return false;
-            }
-            return true;
+            return mThread.quickStart(loop);
         }
 
         /// Поток для обработки callback
