@@ -113,7 +113,7 @@ namespace esp32_c3::objects
                 break;
 
             case QueueReceiveResult::TIMEOUT:
-                ESP_LOGW(TAG, "Receive operation timeout");
+                ESP_LOGD(TAG, "Receive operation timeout");
                 break;
 
             case QueueReceiveResult::QUEUE_ERROR:
