@@ -3,12 +3,11 @@
 
 #include "thread.h"
 #include "buffered_queue.h"
-#include "simple_callback.h"
 
 #include <mutex>
-#include <cstring>
 #include <memory>
 #include <vector>
+#include <functional>
 #include <esp_log.h>
 
 namespace esp32_c3::objects
@@ -16,9 +15,8 @@ namespace esp32_c3::objects
     /**
      * @brief Типизированный менеджер callback-функций
      * @tparam T Тип передаваемых данных
-     * @tparam P Тип параметров callback-функций (по умолчанию void*)
      */
-    template <typename T, typename P = void*>
+    template <typename T>
     class Callback
     {
         static_assert(std::is_trivially_copyable_v<T>,
@@ -41,13 +39,18 @@ namespace esp32_c3::objects
         static constexpr auto TAG = "Callback";
 
         /**
-         * @brief Тип callback-функции
+         * @brief Тип callback-функции (лямбда)
          * @param input Входные данные (read-only)
          * @param output Буфер для результата (может быть nullptr)
-         * @param params Пользовательские параметры
-         * @return true если данные обработаны успешно
+         * @return true если нужно вернуть output
          */
-        using CallbackFunction = bool (*)(const T& input, T& output, P params) noexcept;
+        using CallbackFunction = std::function<bool(const T& input, T& output)>;
+
+        /**
+         * @brief Тип response-функции для возврата результата
+         * @param result Результат обработки данных
+         */
+        using ResponseFunction = std::function<void(const T& result)>;
 
         /**
          * @brief Конструктор менеджера callback-функций
@@ -77,11 +80,6 @@ namespace esp32_c3::objects
                 ESP_LOGI(TAG, "Constructed with buffer size %d and %d callbacks",
                          bufferSize, numCallbacks);
                 free();
-
-                if (!mThread.start(&Callback<T, P>::callbackTask, this))
-                {
-                    ESP_LOGE(TAG, "Failed to start callback thread");
-                }
             }
             else
             {
@@ -92,7 +90,7 @@ namespace esp32_c3::objects
         /// @brief Деструктор (освобождает ресурсы)
         ~Callback()
         {
-            mThread.stop();
+            stopThread();
             ESP_LOGI(TAG, "Callback destroyed");
         }
 
@@ -107,21 +105,19 @@ namespace esp32_c3::objects
         [[nodiscard]] bool isInitialized() const noexcept
         {
             std::lock_guard lock(mMutex);
-            return mQueue.isValid() && mItems && mThread.isRunning();
+            return mQueue.isValid() && mItems;
         }
 
         /**
          * @brief Добавление новой callback-функции
-         * @param func Указатель на callback-функцию
-         * @param params Параметры для функции (опционально)
+         * @param func Лямбда-функция для обработки данных
          * @param onlyIndex Флаг вызова только по индексу (опционально)
          * @return Индекс добавленной функции или -1 при ошибке
          */
         int16_t addCallback(CallbackFunction func,
-                            P params = P{},
-                            bool onlyIndex = false) const noexcept
+                            bool onlyIndex = false) noexcept
         {
-            if (!isInitialized() || !func) return -1;
+            if (!isInitialized() || !func || !run()) return -1;
 
             std::lock_guard lock(mMutex);
 
@@ -130,7 +126,7 @@ namespace esp32_c3::objects
             {
                 if (const int16_t currentIndex = (mLastFreeIndex + i) % mNumItems; !mItems[currentIndex].func)
                 {
-                    mItems[currentIndex] = {onlyIndex, func, params};
+                    mItems[currentIndex] = {onlyIndex, std::move(func)};
                     mLastFreeIndex = (currentIndex + 1) % mNumItems;
 
                     ESP_LOGD(TAG, "Added callback at index %d", currentIndex);
@@ -145,14 +141,19 @@ namespace esp32_c3::objects
         /**
          * @brief Очистка всех зарегистрированных callback-функций
          */
-        void free() const noexcept
+        void free() noexcept
         {
             if (isInitialized())
             {
+                stopThread();
+
                 std::lock_guard lock(mMutex);
                 if (mItems)
                 {
-                    std::memset(mItems.get(), 0, sizeof(Item) * mNumItems);
+                    for (uint8_t i = 0; i < mNumItems; ++i)
+                    {
+                        mItems[i] = {};
+                    }
                 }
                 mLastFreeIndex = 0;
                 ESP_LOGD(TAG, "Cleared all callbacks");
@@ -162,12 +163,12 @@ namespace esp32_c3::objects
         /**
          * @brief Вызывает callback-цепочку с обработкой данных
          * @param input Входные данные (не изменяются)
-         * @param response Колбэк для отправки результата
+         * @param response Лямбда-функция для обработки результата (опционально)
          * @param index Индекс callback (-1 для всех)
          */
         void invoke(const T& input,
-                    SimpleCallback<T>* response = nullptr,
-                    int16_t index = -1) noexcept
+                    ResponseFunction response = nullptr,
+                    const int16_t index = -1) noexcept
         {
             if (!isInitialized())
             {
@@ -175,8 +176,7 @@ namespace esp32_c3::objects
                 return;
             }
 
-            TaskItem item{index, std::move(input), response};
-            if (!mQueue.send(item))
+            if (TaskItem item{index, std::move(input), std::move(response)}; !mQueue.send(item))
             {
                 ESP_LOGE(TAG, "Failed to send item to queue");
             }
@@ -191,7 +191,7 @@ namespace esp32_c3::objects
         {
             if (isInitialized())
             {
-                if (TaskItem item; mQueue.receive(item))
+                if (TaskItem item; const_cast<BufferedQueue<TaskItem, DEFAULT_BUFFER_SIZE>&>(mQueue).receive(item))
                 {
                     value = item.data;
                     return true;
@@ -207,8 +207,7 @@ namespace esp32_c3::objects
         struct Item
         {
             bool onlyIndex;        ///< Флаг вызова только по индексу
-            CallbackFunction func; ///< Указатель на callback-функцию
-            P params;              ///< Параметры для callback-функции
+            CallbackFunction func; ///< Лямбда-функция
         };
 
         /**
@@ -216,19 +215,18 @@ namespace esp32_c3::objects
          */
         struct TaskItem
         {
-            int16_t itemIndex;
-            T data;
-            SimpleCallback<T>* response;
+            int16_t itemIndex;         ///< Индекс callback (-1 для всех)
+            T data;                    ///< Передаваемые данные
+            ResponseFunction response; ///< Функция для возврата результата
         };
 
         /**
-         * @brief Задача для обработки callback-функций
-         * @param arg Указатель на объект Callback
+         * @brief Остановка потока с гарантированным выходом
          */
-        static void callbackTask(void* arg) noexcept
+        void stopThread() noexcept
         {
-            static_cast<Callback*>(arg)->run();
-            vTaskDelete(nullptr);
+            mQueue.reset();
+            mThread.stop();
         }
 
         /**
@@ -244,8 +242,7 @@ namespace esp32_c3::objects
                 activeCallbacks.reserve(mNumItems);
                 for (int i = 0; i < mNumItems; ++i)
                 {
-                    const auto& cb = mItems[i];
-                    if (cb.func && (!cb.onlyIndex || cb.onlyIndex == item.itemIndex))
+                    if (const auto& cb = mItems[i]; cb.func && (!cb.onlyIndex || i == item.itemIndex))
                     {
                         activeCallbacks.push_back(cb);
                     }
@@ -255,23 +252,36 @@ namespace esp32_c3::objects
             // 2. Обрабатываем без блокировки
             for (const auto& cb : activeCallbacks)
             {
-                if (T output; cb.func(item.data, output, cb.params))
+                if (T output; cb.func(item.data, output))
                 {
-                    if (item.response) item.response->invoke(output);
+                    if (item.response) item.response(output);
                 }
             }
         }
 
         /**
-         * @brief Основной цикл обработки
+         * @brief Запуск/проверка рабочего потока
+         * @return true если поток успешно запущен или уже работает
          */
-        void run() noexcept
+        bool run()
         {
-            TaskItem item;
-            while (mQueue.receive(item))
+            if (mThread.state() != Thread::State::NOT_RUNNING) return true;
+
+            auto loop = [&]()
             {
-                process(item);
+                if (TaskItem item; mQueue.receive(item))
+                {
+                    process(item);
+                }
+                return Thread::LoopAction::CONTINUE;
+            };
+
+            if (mThread.start(loop) != ESP_OK)
+            {
+                ESP_LOGE(TAG, "Failed to start callback thread");
+                return false;
             }
+            return true;
         }
 
         /// Поток для обработки callback

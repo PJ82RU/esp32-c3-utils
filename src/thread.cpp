@@ -1,5 +1,8 @@
 #include "esp32_c3_objects/thread.h"
+
 #include <algorithm>
+#include <esp_err.h>
+#include <esp_log.h>
 
 namespace esp32_c3::objects
 {
@@ -14,33 +17,71 @@ namespace esp32_c3::objects
 
     Thread::~Thread() noexcept
     {
-        stop();
+        stop(false);
     }
 
-    bool Thread::start(const TaskFunction_t taskFunc, void* params) noexcept
+    esp_err_t Thread::start(LoopFunc loopFunc, const uint32_t intervalMs, const bool startPaused) noexcept
     {
-        if (mHandle)
+        TaskHandle_t handle = nullptr;
+        if (mHandle.load())
         {
             ESP_LOGE(TAG, "Task %s already running", mName.data());
-            return false;
+            return ESP_ERR_INVALID_STATE;
         }
 
-        if (xTaskCreate(taskFunc, mName.data(), mStackDepth, params, mPriority, &mHandle) == pdPASS)
+        mLoopContext.reset(new LoopContext(
+            std::move(loopFunc),
+            pdMS_TO_TICKS(intervalMs),
+            this,
+            false,
+            startPaused
+        ));
+
+        if (xTaskCreate(loopWrapper, mName.data(), mStackDepth, mLoopContext.get(), mPriority, &handle) != pdPASS)
         {
+            mLoopContext.reset();
+            ESP_LOGE(TAG, "Failed to create loop task %s", mName.data());
+            return ESP_ERR_NO_MEM;
+        }
+        mHandle.store(handle);
+
+        ESP_LOGI(TAG, "Loop task %s started (interval: %" PRIu32 "ms)", mName.data(), intervalMs);
+        return ESP_OK;
+    }
+
+    esp_err_t Thread::start(const TaskFunction_t taskFunc, void* params) noexcept
+    {
+        TaskHandle_t handle = nullptr;
+        if (mHandle.load())
+        {
+            ESP_LOGE(TAG, "Task %s already running", mName.data());
+            return ESP_ERR_INVALID_STATE;
+        }
+
+        if (xTaskCreate(taskFunc, mName.data(), mStackDepth, params, mPriority, &handle) == pdPASS)
+        {
+            mHandle.store(handle);
             ESP_LOGI(TAG, "Task %s created", mName.data());
-            return true;
+            return ESP_OK;
         }
 
         ESP_LOGE(TAG, "Failed to create task %s", mName.data());
-        return false;
+        return ESP_ERR_NO_MEM;
     }
 
-    bool Thread::start(const TaskFunction_t taskFunc, void* params, const BaseType_t coreId) noexcept
+    esp_err_t Thread::start(const TaskFunction_t taskFunc, void* params, const BaseType_t coreId) noexcept
     {
-        if (mHandle)
+        TaskHandle_t handle = nullptr;
+        if (coreId < 0 || coreId >= portNUM_PROCESSORS)
+        {
+            ESP_LOGE(TAG, "Invalid core ID: %d", coreId);
+            return ESP_ERR_INVALID_ARG;
+        }
+
+        if (mHandle.load())
         {
             ESP_LOGE(TAG, "Task %s already running", mName.data());
-            return false;
+            return ESP_ERR_INVALID_STATE;
         }
 
         if (xTaskCreatePinnedToCore(
@@ -49,53 +90,160 @@ namespace esp32_c3::objects
             mStackDepth,
             params,
             mPriority,
-            &mHandle,
+            &handle,
             coreId
         ) == pdPASS)
         {
+            mHandle.store(handle);
             ESP_LOGI(TAG, "Task %s created on core %d", mName.data(), coreId);
-            return true;
+            return ESP_OK;
         }
 
         ESP_LOGE(TAG, "Failed to create task %s on core %d", mName.data(), coreId);
-        return false;
+        return ESP_ERR_NO_MEM;
     }
 
-    void Thread::stop() noexcept
+    // ReSharper disable CppDFAConstantConditions
+    void Thread::stop(const bool softStop) noexcept
     {
-        if (mHandle)
+        const TaskHandle_t handle = mHandle.exchange(nullptr);
+        if (!handle) return;
+
+        if (softStop && mLoopContext)
         {
-            vTaskDelete(mHandle);
-            mHandle = nullptr;
-            ESP_LOGI(TAG, "Task %s deleted", mName.data());
+            mLoopContext->shouldStop = true;
+
+            constexpr TickType_t timeoutStep = pdMS_TO_TICKS(10);
+            const TickType_t end = xTaskGetTickCount() + pdMS_TO_TICKS(1000);
+
+            while (handle && end > xTaskGetTickCount())
+            {
+                vTaskDelay(timeoutStep);
+                // Проверяем, не был ли хендл уже удален в другом потоке
+                if (mHandle.load() == nullptr)
+                {
+                    return;
+                }
+            }
+
+            if (handle)
+            {
+                ESP_LOGW(TAG, "Task %s didn't stop gracefully, forcing stop", mName.data());
+                vTaskDelete(handle);
+            }
+        }
+        else
+        {
+            vTaskDelete(handle);
+            ESP_LOGI(TAG, "Task %s forcefully deleted", mName.data());
         }
     }
 
-    bool Thread::isRunning() const noexcept
+    Thread::State Thread::state() const noexcept
     {
-        return mHandle != nullptr;
+        const TaskHandle_t handle = mHandle.load();
+        if (!handle)
+        {
+            return State::NOT_RUNNING;
+        }
+
+        switch (eTaskGetState(handle))
+        {
+        case eReady: return State::READY;
+        case eRunning: return State::RUNNING;
+        case eBlocked: return State::SUSPENDED; // В FreeRTOS eBlocked часто означает ожидание
+        case eSuspended: return State::SUSPENDED;
+        default: return State::NOT_RUNNING;
+        }
     }
 
     void Thread::suspend() const noexcept
     {
-        if (mHandle)
+        if (const TaskHandle_t handle = mHandle.load())
         {
-            vTaskSuspend(mHandle);
+            vTaskSuspend(handle);
             ESP_LOGI(TAG, "Task %s suspended", mName.data());
         }
     }
 
     void Thread::resume() const noexcept
     {
-        if (mHandle)
+        if (const TaskHandle_t handle = mHandle.load())
         {
-            vTaskResume(mHandle);
+            vTaskResume(handle);
             ESP_LOGI(TAG, "Task %s resumed", mName.data());
         }
     }
 
+    esp_err_t Thread::setPriority(const UBaseType_t newPriority) noexcept
+    {
+        const TaskHandle_t handle = mHandle.load();
+        if (!handle)
+        {
+            return ESP_ERR_INVALID_STATE;
+        }
+
+        vTaskPrioritySet(handle, newPriority);
+        mPriority = newPriority;
+        ESP_LOGI(TAG, "Task %s priority changed to %d", mName.data(), newPriority);
+        return ESP_OK;
+    }
+
+    uint32_t Thread::stackSize() const noexcept
+    {
+        return mStackDepth;
+    }
+
     UBaseType_t Thread::stackHighWaterMark() const noexcept
     {
-        return mHandle ? uxTaskGetStackHighWaterMark(mHandle) : 0;
+        const TaskHandle_t handle = mHandle.load();
+        return handle ? uxTaskGetStackHighWaterMark(handle) : 0;
+    }
+
+    const char* Thread::name() const noexcept
+    {
+        return mName.data();
+    }
+
+    void Thread::loopWrapper(void* arg) noexcept
+    {
+        if (!arg)
+        {
+            ESP_LOGE(TAG, "Null context in loop wrapper");
+            vTaskDelete(nullptr);
+            return;
+        }
+
+        auto* ctx = static_cast<LoopContext*>(arg);
+        if (ctx->isStartPaused.load(std::memory_order_acquire))
+        {
+            ctx->thread->suspend();
+        }
+
+        while (!ctx->shouldStop.load(std::memory_order_relaxed))
+        {
+            const auto action = ctx->func();
+
+            if (action == LoopAction::CONTINUE)
+            {
+                vTaskDelay(ctx->interval);
+                continue;
+            }
+
+            if (action == LoopAction::PAUSE)
+            {
+                ctx->thread->suspend();
+                continue;
+            }
+
+            if (action == LoopAction::STOP)
+            {
+                ctx->shouldStop.store(true, std::memory_order_release);
+                break;
+            }
+        }
+
+        ctx->thread->mHandle = nullptr;
+        vTaskDelete(nullptr);
     }
 } // namespace esp32_c3::objects

@@ -100,19 +100,37 @@ namespace esp32_c3::objects
         {
             if (!mInitialized) return false;
 
-            QueueItem qi;
-            if (!mQueue.receive(qi, ticksToWait))
+            switch (QueueItem qi; mQueue.receive(qi, ticksToWait))
             {
-                ESP_LOGW(TAG, "Failed to receive from queue");
-                return false;
+            case QueueReceiveResult::SUCCESS:
+                // Копируем данные из буфера и возвращаем индекс в пул
+                item = mBuffer[qi.index];
+                returnFreeIndex(qi.index);
+                return true;
+
+            case QueueReceiveResult::ABORTED:
+                ESP_LOGD(TAG, "Receive operation aborted");
+                break;
+
+            case QueueReceiveResult::TIMEOUT:
+                ESP_LOGW(TAG, "Receive operation timeout");
+                break;
+
+            case QueueReceiveResult::QUEUE_ERROR:
+                ESP_LOGE(TAG, "Queue error");
+                break;
+            default: ;
             }
+            return false;
+        }
 
-            // Копируем данные из буфера
-            item = mBuffer[qi.index];
-
-            // Возвращаем индекс в пул
-            returnFreeIndex(qi.index);
-            return true;
+        /**
+         * @brief Прервать блокирующую операцию receive и очистить очередь
+         * @return true если успешно
+         */
+        bool reset() const noexcept
+        {
+            return mInitialized && mQueue.reset();
         }
 
         /// @brief Количество свободных мест в очереди
@@ -133,12 +151,12 @@ namespace esp32_c3::objects
             size_t index; ///< Индекс элемента в буфере
         };
 
-        bool getFreeIndex(size_t& index, TickType_t ticksToWait) const noexcept
+        bool getFreeIndex(size_t& index, const TickType_t ticksToWait) const noexcept
         {
-            return mInitialized && mFreeIndices.receive(index, ticksToWait);
+            return mInitialized && mFreeIndices.receive(index, ticksToWait) == QueueReceiveResult::SUCCESS;
         }
 
-        void returnFreeIndex(size_t index) const noexcept
+        void returnFreeIndex(const size_t index) const noexcept
         {
             if (mInitialized)
             {
