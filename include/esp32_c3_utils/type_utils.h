@@ -14,9 +14,9 @@ namespace esp32_c3::utils
      * @return constexpr std::array<char, N> с текстом тега
      */
     template <typename T>
-    constexpr auto generateTag(const char* class_name)
+    constexpr auto generateTag(const char* className)
     {
-        constexpr auto type_name =
+        constexpr auto typeName =
 #ifdef _MSC_VER
             __FUNCSIG__;
 #else
@@ -24,18 +24,18 @@ namespace esp32_c3::utils
 #endif
 
         // Ищем начало типа в строке
-        const char* type_start = strstr(type_name, "T = ") + 4;
-        const char* type_end = strchr(type_start, ';');
-        if (!type_end) type_end = strchr(type_start, ']');
-        if (!type_end) type_end = type_start + strlen(type_start);
+        const char* typeStart = strstr(typeName, "T = ") + 4;
+        const char* typeEnd = strchr(typeStart, ';');
+        if (!typeEnd) typeEnd = strchr(typeStart, ']');
+        if (!typeEnd) typeEnd = typeStart + strlen(typeStart);
 
         // Вычисляем длину
-        const size_t type_len = type_end - type_start;
+        const size_t typeLen = typeEnd - typeStart;
 
         // Создаем массив для хранения
         std::array<char, 64> result{};
         snprintf(result.data(), result.size(), "%s<%.*s>",
-                 class_name, static_cast<int>(type_len), type_start);
+                 className, static_cast<int>(typeLen), typeStart);
 
         return result;
     }
