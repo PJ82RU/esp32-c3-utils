@@ -1,7 +1,6 @@
 #ifndef ESP32_C3_TYPE_UTILS_H
 #define ESP32_C3_TYPE_UTILS_H
 
-#include <array>
 #include <cstdio>
 #include <cstring>
 #include <esp_log.h>
@@ -11,10 +10,10 @@ namespace esp32_c3::utils
     /**
      * @brief Генерация тега для логов на основе типа
      * @tparam T Тип для которого генерируется тег
-     * @return constexpr std::array<char, N> с текстом тега
+     * @return constexpr указатель на строку с текстом тега
      */
     template <typename T>
-    constexpr auto generateTag(const char* className)
+    constexpr const char* generateTag(const char* className)
     {
         constexpr auto typeName =
 #ifdef _MSC_VER
@@ -29,16 +28,19 @@ namespace esp32_c3::utils
         if (!typeEnd) typeEnd = strchr(typeStart, ']');
         if (!typeEnd) typeEnd = typeStart + strlen(typeStart);
 
-        // Вычисляем длину
+        // Вычисляем длину типа
         const size_t typeLen = typeEnd - typeStart;
+        const size_t classNameLen = strlen(className);
 
-        // Создаем массив для хранения
-        std::array<char, 64> result{};
-        snprintf(result.data(), result.size(), "%s<%.*s>",
+        // Статический буфер для каждого специализированного типа
+        static char buffer[64] = {};
+
+        // Формируем строку тега
+        snprintf(buffer, sizeof(buffer), "%s<%.*s>",
                  className, static_cast<int>(typeLen), typeStart);
 
-        return result;
+        return buffer;
     }
 } // namespace esp32_c3::utils
 
-#endif //ESP32_C3_TYPE_UTILS_H
+#endif // ESP32_C3_TYPE_UTILS_H
