@@ -221,7 +221,7 @@ namespace esp32_c3::objects
 
     bool Thread::shouldMonitorStack() noexcept
     {
-        return esp_log_level_get(TAG) >= ESP_LOG_WARN;
+        return esp_log_level_get(TAG) >= ESP_LOG_ERROR;
     }
 
     void Thread::checkStack() const noexcept
