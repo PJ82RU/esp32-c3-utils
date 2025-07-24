@@ -145,6 +145,15 @@ namespace esp32_c3::objects
             return mInitialized ? mQueue.messagesWaiting() : 0;
         }
 
+        /**
+         * @brief Проверка, пуста ли очередь
+         * @return true если очередь пуста или не инициализирована
+         */
+        [[nodiscard]] bool empty() const noexcept
+        {
+            return !mInitialized || (mQueue.messagesWaiting() == 0);
+        }
+
     private:
         struct QueueItem
         {
