@@ -145,6 +145,16 @@ namespace esp32_c3::objects
         [[nodiscard]] UBaseType_t stackHighWaterMark() const noexcept;
 
         /**
+         * @brief Проверяет, нужно ли мониторить стек
+         */
+        [[nodiscard]] static bool shouldMonitorStack() noexcept;
+
+        /**
+         * @brief Проверить, достаточно ли свободного стека
+         */
+        void checkStack() const noexcept;
+
+        /**
          * @brief Получение имени задачи
          * @return Указатель на имя задачи
          */
@@ -189,6 +199,8 @@ namespace esp32_c3::objects
         // Указатели
         std::atomic<TaskHandle_t> mHandle{nullptr}; ///< Хэндл задачи FreeRTOS
         std::unique_ptr<LoopContext> mLoopContext;  ///< Контекст цикла выполнения
+
+        const UBaseType_t mStackWarningThreshold; ///< Порог для предупреждений
     };
 } // namespace esp32_c3::objects
 

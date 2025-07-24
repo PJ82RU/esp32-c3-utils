@@ -8,11 +8,19 @@ namespace esp32_c3::objects
 {
     Thread::Thread(const std::string_view name, const uint32_t stackDepth, const UBaseType_t priority) noexcept
         : mStackDepth(stackDepth),
-          mPriority(priority)
+          mPriority(priority),
+          mStackWarningThreshold(stackDepth / 10)
     {
         const size_t copySize = std::min(name.size(), THREAD_NAME_SIZE - 1);
         std::copy_n(name.begin(), copySize, mName.begin());
         mName[copySize] = '\0';
+
+        if (shouldMonitorStack())
+        {
+            ESP_LOGI(TAG, "[%.*s] Stack monitoring active (threshold: %lu words)",
+                     static_cast<int>(name.size()), name.data(),
+                     (unsigned long)mStackWarningThreshold);
+        }
     }
 
     Thread::~Thread() noexcept
@@ -211,6 +219,28 @@ namespace esp32_c3::objects
         return handle ? uxTaskGetStackHighWaterMark(handle) : 0;
     }
 
+    bool Thread::shouldMonitorStack() noexcept
+    {
+        return esp_log_level_get(TAG) >= ESP_LOG_WARN;
+    }
+
+    void Thread::checkStack() const noexcept
+    {
+        if (!shouldMonitorStack()) return;
+
+        const TaskHandle_t handle = mHandle.load();
+        if (!handle) return;
+
+        if (const UBaseType_t free = uxTaskGetStackHighWaterMark(handle); free < mStackWarningThreshold)
+        {
+            ESP_LOGW(TAG, "[%s] Low stack: %lu/%lu words (%.1f%%)",
+                     mName.data(),
+                     (unsigned long)free,
+                     (unsigned long)mStackDepth,
+                     (free * 100.0f) / mStackDepth);
+        }
+    }
+
     const char* Thread::name() const noexcept
     {
         return mName.data();
@@ -233,6 +263,9 @@ namespace esp32_c3::objects
 
         while (!ctx->shouldStop.load(std::memory_order_relaxed))
         {
+            // Автоматическая проверка стека
+            ctx->thread->checkStack();
+
             const auto action = ctx->func();
 
             if (action == LoopAction::CONTINUE)
