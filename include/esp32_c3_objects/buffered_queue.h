@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "esp32_c3_utils/type_utils.h"
+
 #include "queue.h"
 #include <memory>
 #include "esp_log.h"
@@ -18,9 +20,6 @@ namespace esp32_c3::objects
     class BufferedQueue
     {
     public:
-        /// @brief Тег для логирования
-        static constexpr auto TAG = "BufferedQueue";
-
         /**
          * @brief Конструктор
          * @param queueLength Максимальное количество элементов в очереди
@@ -46,7 +45,8 @@ namespace esp32_c3::objects
                 }
             }
 
-            ESP_LOGD(TAG, "BufferedQueue %s initialized (buffer size: %zu)",
+            ESP_LOGD((utils::generateTag<BufferedQueue<T, BufferSize>>()),
+                     "BufferedQueue %s initialized (buffer size: %zu)",
                      mInitialized ? "successfully" : "failed to", BufferSize);
         }
 
@@ -72,7 +72,7 @@ namespace esp32_c3::objects
             size_t index;
             if (!getFreeIndex(index, ticksToWait))
             {
-                ESP_LOGW(TAG, "Failed to get free index");
+                ESP_LOGW((utils::generateTag<BufferedQueue<T, BufferSize>>()), "Failed to get free index");
                 return false;
             }
 
@@ -82,7 +82,7 @@ namespace esp32_c3::objects
             // Отправляем индекс в очередь
             if (QueueItem qi{index}; !mQueue.send(qi, ticksToWait))
             {
-                ESP_LOGE(TAG, "Failed to send item to queue");
+                ESP_LOGE((utils::generateTag<BufferedQueue<T, BufferSize>>()), "Failed to send item to queue");
                 returnFreeIndex(index);
                 return false;
             }
@@ -109,15 +109,15 @@ namespace esp32_c3::objects
                 return true;
 
             case QueueReceiveResult::ABORTED:
-                ESP_LOGD(TAG, "Receive operation aborted");
+                ESP_LOGD((utils::generateTag<BufferedQueue<T, BufferSize>>()), "Receive operation aborted");
                 break;
 
             case QueueReceiveResult::TIMEOUT:
-                ESP_LOGD(TAG, "Receive operation timeout");
+                ESP_LOGD((utils::generateTag<BufferedQueue<T, BufferSize>>()), "Receive operation timeout");
                 break;
 
             case QueueReceiveResult::QUEUE_ERROR:
-                ESP_LOGE(TAG, "Queue error");
+                ESP_LOGE((utils::generateTag<BufferedQueue<T, BufferSize>>()), "Queue error");
                 break;
             default: ;
             }

@@ -1,6 +1,8 @@
 #ifndef ESP32_C3_UTILS_QUEUE_H
 #define ESP32_C3_UTILS_QUEUE_H
 
+#include "esp32_c3_utils/type_utils.h"
+
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
 #include <utility>
@@ -26,9 +28,6 @@ namespace esp32_c3::objects
     class Queue
     {
     public:
-        /// @brief Тег для логирования
-        static constexpr auto TAG = "Queue";
-
         /**
          * @brief Конструктор очереди
          * @param queueLength Максимальное количество элементов
@@ -41,12 +40,12 @@ namespace esp32_c3::objects
             mHandle = xQueueCreate(queueLength, sizeof(T));
             if (mHandle == nullptr)
             {
-                ESP_LOGE(TAG, "Queue creation failed (length=%u, size=%zu)",
+                ESP_LOGE(utils::generateTag<Queue<T>>(), "Queue creation failed (length=%u, size=%zu)",
                          queueLength, sizeof(T));
             }
             else
             {
-                ESP_LOGD(TAG, "Queue created (length=%u)", queueLength);
+                ESP_LOGD(utils::generateTag<Queue<T>>(), "Queue created (length=%u)", queueLength);
             }
         }
 
@@ -163,7 +162,7 @@ namespace esp32_c3::objects
             {
                 vQueueDelete(mHandle);
                 mHandle = nullptr;
-                ESP_LOGD(TAG, "Queue deleted");
+                ESP_LOGD(utils::generateTag<Queue<T>>(), "Queue deleted");
             }
         }
 

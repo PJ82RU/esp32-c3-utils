@@ -3,6 +3,7 @@
 
 #include "thread.h"
 #include "buffered_queue.h"
+#include "esp32_c3_utils/type_utils.h"
 
 #include <mutex>
 #include <memory>
@@ -34,9 +35,6 @@ namespace esp32_c3::objects
 
         /// @brief Приоритет задачи по умолчанию
         static constexpr UBaseType_t DEFAULT_PRIORITY = 18;
-
-        /// @brief Тег для логирования
-        static constexpr auto TAG = "Callback";
 
         /**
          * @brief Тип callback-функции (лямбда)
@@ -77,13 +75,13 @@ namespace esp32_c3::objects
         {
             if (mQueue.isValid() && numCallbacks > 0)
             {
-                ESP_LOGI(TAG, "Constructed with buffer size %d and %d callbacks",
+                ESP_LOGI(utils::generateTag<Callback<T>>(), "Constructed with buffer size %d and %d callbacks",
                          bufferSize, numCallbacks);
                 free();
             }
             else
             {
-                ESP_LOGE(TAG, "Memory allocation failed");
+                ESP_LOGE(utils::generateTag<Callback<T>>(), "Memory allocation failed");
             }
         }
 
@@ -91,7 +89,7 @@ namespace esp32_c3::objects
         ~Callback()
         {
             stopThread();
-            ESP_LOGI(TAG, "Callback destroyed");
+            ESP_LOGI(utils::generateTag<Callback<T>>(), "Callback destroyed");
         }
 
         // Запрещаем копирование объектов
@@ -129,12 +127,12 @@ namespace esp32_c3::objects
                     mItems[currentIndex] = {onlyIndex, std::move(func)};
                     mLastFreeIndex = (currentIndex + 1) % mNumItems;
 
-                    ESP_LOGD(TAG, "Added callback at index %d", currentIndex);
+                    ESP_LOGD(utils::generateTag<Callback<T>>(), "Added callback at index %d", currentIndex);
                     return currentIndex;
                 }
             }
 
-            ESP_LOGW(TAG, "No free slots for callback");
+            ESP_LOGW(utils::generateTag<Callback<T>>(), "No free slots for callback");
             return -1;
         }
 
@@ -156,7 +154,7 @@ namespace esp32_c3::objects
                     }
                 }
                 mLastFreeIndex = 0;
-                ESP_LOGD(TAG, "Cleared all callbacks");
+                ESP_LOGD(utils::generateTag<Callback<T>>(), "Cleared all callbacks");
             }
         }
 
@@ -172,13 +170,13 @@ namespace esp32_c3::objects
         {
             if (!isInitialized())
             {
-                ESP_LOGE(TAG, "Invoke failed: not initialized or null input");
+                ESP_LOGE(utils::generateTag<Callback<T>>(), "Invoke failed: not initialized or null input");
                 return;
             }
 
             if (TaskItem item{index, std::move(input), std::move(response)}; !mQueue.send(item))
             {
-                ESP_LOGE(TAG, "Failed to send item to queue");
+                ESP_LOGE(utils::generateTag<Callback<T>>(), "Failed to send item to queue");
             }
         }
 
